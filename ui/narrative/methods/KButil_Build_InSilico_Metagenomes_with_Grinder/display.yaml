@@ -31,41 +31,89 @@ parameters :
         ui-name : |
             Description
         short-hint : |
-            Describe Purpose or Contents of Output ReadsSet
+            Describe Purpose or Contents of Output Metagenome(s)
         placeholder: |
             Enter Description
     input_refs:
         ui-name : |
-            Reads libraries
+            Genomes
         short-hint : |
-            Reads Library Name here (PairedEndLibraries or ReadsSet of PELibs)
+            Genomes to puree
     output_name:
         ui-name : |
-            Output readsSet name
+            Output Reads name
         short-hint : |
-            Name for the Output ReadsSet
-    reads_num:
+            Name for the Output ReadsSet (if multiple MGs) or Output ReadsLib
+    num_reads_per_lib:
         ui-name : |
-            Num reads
+            Num reads per MG
         short-hint : |
             Number of reads to put into each library sample
     population_percs:
         ui-name : |
-            Perc reads per sample (1-100)
+            Population Perc per genome (row) per sample (col)
         short-hint : |
-            Percentage of original reads library to put into each sample library
-    seed:
+            Percentage of each genome (row) to put into each sample library (col) (values should be 0-100)
+    read_len_mean:
         ui-name : |
-            Random Seed (optional)
+            Read Len Mean
         short-hint : |
-            Specify seed for Randomizer if you want repeatable results
-
-parameter-groups :
-    subsample_fraction :
-        ui-name: |
-            Subsample Fraction
+            Average read length
+    read_len_stddev:
+        ui-name : |
+            Read Len Std Dev
         short-hint : |
-            Provide number of reads per sublibrary and percentage of that output library for each genome/readsLib
+            Read Len Std Dev in a normal distribution
+    pairs_flag:
+        ui-name : |
+            Single or Paired End?
+        short-hint : |
+            Generate Single or Paired End Libraries
+    mate_orientation:
+        ui-name : |
+            Pair Orientation
+        short-hint : |
+            If Paired End indicate orientation of reads
+    insert_len_mean:
+        ui-name : |
+            Insert Len Mean
+        short-hint : |
+            Average insert length (includes reads)
+    insert_len_stddev:
+        ui-name : |
+            Insert Len Std Dev
+        short-hint : |
+            Insert Len Std Dev in a normal distribution
+    mutation_dist:
+        ui-name : |
+            Mutation model
+        short-hint : |
+            Introduce mutations following distribution model
+    mutation_ratio:
+        ui-name : |
+            Mutation Sub / Indels
+        short-hint : |
+            Ratio of subtitution vs. indel mutations
+    qual_good:
+        ui-name : |
+            Good Qual Score Value
+        short-hint : |
+            Indicate what should be considered a good qual score
+    qual_bad:
+        ui-name : |
+            Bad Qual Score Value
+        short-hint : |
+            Indicate what should be considered a bad qual score
+    len_bias_flag:
+        ui-name : |
+            Use Genome Len Bias?
+        short-hint : |
+            Bias proportions by genome length (i.e. more reads from longer genomes)
+    random_seed:
+        ui-name : |
+            Random Seed
+        short-hint : |
+            Specify seed for Randomizer
 
 description : |
     <p>This method allows the user to generate In Silico reads using the Grinder method (v0.5.4).  This is especially useful in benchmarking methods applied to reads, such as assembly.</p>
