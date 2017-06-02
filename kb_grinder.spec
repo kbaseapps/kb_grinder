@@ -27,17 +27,29 @@ module kb_grinder {
     **  Use Grinder to generate in silico shotgun metagenomes
     */
     typedef structure {
-	int            reads_num;
-	string         population_percs;
-    } InSilico_Reads_Options;
-    typedef structure {
         workspace_name workspace_name;
-	data_obj_ref   input_refs;    /* ReadsLibrary */
-        data_obj_name  output_name;   /* ReadsSet */
-	InSilico_Reads_Options subsample_fraction;
-	/*bool           reads_uniq;*/  /* sampling without replacement */
+	data_obj_ref   input_refs;    /* Genomes */
+        data_obj_name  output_name;   /* ReadsSet or ReadsLib if only one MG being generated */
 	string         desc;
-	int            seed;
+
+	/* params */
+	int     num_reads_per_lib;
+	string  population_percs;
+	
+	/* advanced params */
+	int     read_len_mean;
+	float   read_len_stddev;
+	int     pairs_flag;
+	string  mate_orientation;
+	int     insert_len_mean;
+	float   insert_len_stddev;
+	string  mutation_dist;
+	string  mutation_ratio;
+	int     qual_good;
+	int     qual_bad;
+	int     len_bias_flag;
+	int     random_seed;
+
     } KButil_Build_InSilico_Metagenomes_with_Grinder_Params;
 
     typedef structure {
