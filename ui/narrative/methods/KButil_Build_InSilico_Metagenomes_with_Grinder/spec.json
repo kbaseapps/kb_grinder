@@ -13,7 +13,7 @@
     "parameters": [ 
         {
             "id": "desc",
-            "optional": false,
+            "optional": true,
             "advanced": false,
             "allow_multiple": false,
             "default_values": [ "" ],
@@ -30,7 +30,7 @@
             "default_values": [ "" ],
             "field_type": "text",
             "text_options": {
-                "valid_ws_types": [ "KBaseFile.PairedEndLibrary" ]
+                "valid_ws_types": [ "KBaseGenomes.Genome" ]
             }
         },
         {
@@ -41,16 +41,16 @@
             "default_values": [ "" ],
             "field_type": "text",
             "text_options": {
-                "valid_ws_types": [ "KBaseSets.ReadsSet" ],
+                "valid_ws_types": [ "KBaseSets.ReadsSet","KBaseFile.PairedEndLibrary" ],
 		"is_output_name": true
             }
         },
         {
-            "id": "reads_num",
-            "optional": true,
+            "id": "num_reads_per_lib",
+            "optional": false,
             "advanced": false,
             "allow_multiple": false,
-            "default_values": [ "10000" ],
+            "default_values": [ "1000000" ],
             "field_type": "text",
             "text_options": {
 		"validate_as": "int"
@@ -68,25 +68,291 @@
             }
         },
         {
-            "id": "seed",
-            "optional": true,
+            "id": "read_len_mean",
+            "optional": false,
             "advanced": true,
             "allow_multiple": false,
-            "default_values": [ "" ],
+            "default_values": [ "150" ],
             "field_type": "text",
             "text_options": {
 		"validate_as": "int"
             }
-        }
-    ],
-
-    "parameter-groups": [
-     	{
-	    "id": "subsample_fraction",
-            "parameters": ["reads_num", "population_percs"],
+        },
+        {
+            "id": "read_len_stddev",
             "optional": false,
+            "advanced": true,
             "allow_multiple": false,
-            "with_border": true
+            "default_values": [ "0.0" ],
+            "field_type": "text",
+            "text_options": {
+		"validate_as": "float"
+            }
+        },
+        {
+            "id": "pairs_flag",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "1" ],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "options": [
+                                {
+                                        "value": "0",
+                                        "display": "Single End Library",
+                                        "id": "SE",
+                                        "ui-name": "SE"
+                                },
+                                {
+                                        "value": "1",
+                                        "display": "Paired End Library",
+                                        "id": "PE",
+                                        "ui-name": "PE"
+                                }
+			]
+            }
+        },
+        {
+            "id": "mate_orientation",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "FR" ],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "options": [
+                                {
+                                        "value": "FR",
+                                        "display": "FR:  ---> <---  e.g. Sanger, Illumina paired-end, IonTorrent mate-pair",
+                                        "id": "FR",
+                                        "ui-name": "FR"
+                                },
+                                {
+                                        "value": "FF",
+                                        "display": "FF:  ---> --->  e.g. 454",
+                                        "id": "FF",
+                                        "ui-name": "FF"
+                                },
+                                {
+                                        "value": "RF",
+                                        "display": "RF:  <--- --->  e.g. Illumina mate-pair",
+                                        "id": "RF",
+                                        "ui-name": "RF"
+                                },
+                                {
+                                        "value": "RR",
+                                        "display": "RR:  <--- <---",
+                                        "id": "RR",
+                                        "ui-name": "RR"
+                                }
+			]
+            }
+        },
+        {
+            "id": "insert_len_mean",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "2500" ],
+            "field_type": "text",
+            "text_options": {
+		"validate_as": "int"
+            }
+        },
+        {
+            "id": "insert_len_stddev",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "200" ],
+            "field_type": "text",
+            "text_options": {
+		"validate_as": "int"
+            }
+        },
+        {
+            "id": "mutation_dist",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "poly4 3e-3 3.3e-8" ],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "options": [
+                                {
+                                        "value": "uniform 0",
+                                        "display": "uniform 0",
+                                        "id": "uniform 0",
+                                        "ui-name": "uniform 0"
+                                },
+                                {
+                                        "value": "uniform 0.1",
+                                        "display": "uniform 0.1",
+                                        "id": "uniform 0.1",
+                                        "ui-name": "uniform 0.1"
+                                },
+                                {
+                                        "value": "uniform 0.5",
+                                        "display": "uniform 0.5",
+                                        "id": "uniform 0.5",
+                                        "ui-name": "uniform 0.5"
+                                },
+                                {
+                                        "value": "uniform 1.0",
+                                        "display": "uniform 1.0",
+                                        "id": "uniform 1.0",
+                                        "ui-name": "uniform 1.0"
+                                },
+                                {
+                                        "value": "linear 1 2",
+                                        "display": "linear 1 2 (e.g. Sanger)",
+                                        "id": "linear 1 2",
+                                        "ui-name": "linear 1 2"
+                                },
+                                {
+                                        "value": "poly4 3e-3 3.3e-8",
+                                        "display": "poly4 3e-3 3.3e-8 (e.g. Illumina)",
+                                        "id": "poly4 3e-3 3.3e-8",
+                                        "ui-name": "poly4 3e-3 3.3e-8"
+                                }
+			]
+            }
+        },
+        {
+            "id": "mutation_ratio",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "80 20" ],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "options": [
+                                {
+                                        "value": "100 0",
+                                        "display": "100% sub / 0% indel",
+                                        "id": "100 0",
+                                        "ui-name": "100 0"
+                                },
+                                {
+                                        "value": "90 10",
+                                        "display": "90% sub / 10% indel",
+                                        "id": "90 10",
+                                        "ui-name": "90 10"
+                                },
+                                {
+                                        "value": "80 20",
+                                        "display": "80% sub / 20% indel",
+                                        "id": "80 20",
+                                        "ui-name": "80 20"
+                                },
+                                {
+                                        "value": "70 30",
+                                        "display": "70% sub / 30% indel",
+                                        "id": "70 30",
+                                        "ui-name": "70 30"
+                                },
+                                {
+                                        "value": "60 40",
+                                        "display": "60% sub / 40% indel",
+                                        "id": "60 40",
+                                        "ui-name": "60 40"
+                                },
+                                {
+                                        "value": "50 50",
+                                        "display": "50% sub / 50% indel",
+                                        "id": "50 50",
+                                        "ui-name": "50 50"
+                                },
+                                {
+                                        "value": "40 60",
+                                        "display": "40% sub / 60% indel",
+                                        "id": "40 60",
+                                        "ui-name": "40 60"
+                                },
+                                {
+                                        "value": "30 70",
+                                        "display": "30% sub / 70% indel",
+                                        "id": "30 70",
+                                        "ui-name": "30 70"
+                                },
+                                {
+                                        "value": "20 80",
+                                        "display": "20% sub / 80% indel",
+                                        "id": "20 80",
+                                        "ui-name": "20 80"
+                                },
+                                {
+                                        "value": "10 90",
+                                        "display": "10% sub / 90% indel",
+                                        "id": "10 90",
+                                        "ui-name": "10 90"
+                                },
+                                {
+                                        "value": "0 100",
+                                        "display": "0% sub / 100% indel",
+                                        "id": "0 100",
+                                        "ui-name": "0 100"
+                                }
+			]
+            }
+        },
+        {
+            "id": "qual_good",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "30" ],
+            "field_type": "text",
+            "text_options": {
+		"validate_as": "int"
+            }
+        },
+        {
+            "id": "qual_bad",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "10" ],
+            "field_type": "text",
+            "text_options": {
+		"validate_as": "int"
+            }
+        },
+        {
+            "id": "len_bias_flag",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "poly4 3e-3 3.3e-8" ],
+            "field_type": "dropdown",
+            "dropdown_options": {
+                "options": [
+                                {
+                                        "value": "0",
+                                        "display": "NO",
+                                        "id": "NO",
+                                        "ui-name": "NO"
+                                },
+                                {
+                                        "value": "1",
+                                        "display": "YES",
+                                        "id": "YES",
+                                        "ui-name": "YES"
+                                }
+			]
+            }
+        },
+        {
+            "id": "random_seed",
+            "optional": false,
+            "advanced": true,
+            "allow_multiple": false,
+            "default_values": [ "1" ],
+            "field_type": "text",
+            "text_options": {
+		"validate_as": "int"
+            }
         }
     ],
 
@@ -114,12 +380,60 @@
                     "target_property": "output_name"
                 },
                 {
-                    "input_parameter": "seed",
-                    "target_property": "seed"
+                    "input_parameter": "num_reads_per_lib",
+                    "target_property": "num_reads_per_lib"
                 },
                 {
-                    "input_parameter": "subsample_fraction",
-                    "target_property": "subsample_fraction"
+                    "input_parameter": "population_percs",
+                    "target_property": "population_percs"
+                },
+                {
+                    "input_parameter": "read_len_mean",
+                    "target_property": "read_len_mean"
+                },
+                {
+                    "input_parameter": "read_len_stddev",
+                    "target_property": "read_len_stddev"
+                },
+                {
+                    "input_parameter": "pairs_flag",
+                    "target_property": "pairs_flag"
+                },
+                {
+                    "input_parameter": "mate_orientation",
+                    "target_property": "mate_orientation"
+                },
+                {
+                    "input_parameter": "insert_len_mean",
+                    "target_property": "insert_len_mean"
+                },
+                {
+                    "input_parameter": "insert_len_stddev",
+                    "target_property": "insert_len_stddev"
+                },
+                {
+                    "input_parameter": "mutation_dist",
+                    "target_property": "mutation_dist"
+                },
+                {
+                    "input_parameter": "mutation_ratio",
+                    "target_property": "mutation_ratio"
+                },
+                {
+                    "input_parameter": "qual_good",
+                    "target_property": "qual_good"
+                },
+                {
+                    "input_parameter": "qual_bad",
+                    "target_property": "qual_bad"
+                },
+                {
+                    "input_parameter": "len_bias_flag",
+                    "target_property": "len_bias_flag"
+                },
+                {
+                    "input_parameter": "random_seed",
+                    "target_property": "random_seed"
                 }
             ],
             "output_mapping": [
