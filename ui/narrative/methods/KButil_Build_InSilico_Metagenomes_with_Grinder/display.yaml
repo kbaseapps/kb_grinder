@@ -6,7 +6,7 @@ tooltip: |
     Generate In Silico reads from microbial genomes following input proportions
 screenshots: []
 
-icon: kb-pink.png
+icon: grinder-green.png
 
 #
 # define a set of similar methods that might be useful to the user
