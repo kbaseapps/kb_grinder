@@ -61,7 +61,7 @@
             "optional": false,
             "advanced": false,
             "allow_multiple": false,
-            "default_values": [ "Genome\tSmpl_1\tSmpl_2\tSmpl_3\tetc.\ngenome-1\t10.0%\t10.0%\t10.0%\ngenome-2\t10.0%\t10.0%\t10.0%\ngenome-3\t10.0%\t10.0%\t10.0%\ngenome-4\t10.0%\t10.0%\t10.0%\ngenome-5\t10.0%\t10.0%\t10.0%\ngenome-6\t10.0%\t10.0%\t10.0%\ngenome-7\t10.0%\t10.0%\t10.0%\ngenome-8\t10.0%\t10.0%\t10.0%\ngenome-9\t10.0%\t10.0%\t10.0%\ngenome-10\t10.0%\t10.0%\t10.0%\n" ],
+            "default_values": [ "Genome\tS1\tS2\tS3\tetc.\nG1\t10.0%\t10.0%\t10.0%\nG2\t10.0%\t10.0%\t10.0%\nG3\t10.0%\t10.0%\t10.0%\nG4\t10.0%\t10.0%\t10.0%\nG5\t10.0%\t10.0%\t10.0%\nG6\t10.0%\t10.0%\t10.0%\nG7\t10.0%\t10.0%\t10.0%\nG8\t10.0%\t10.0%\t10.0%\nG9\t10.0%\t10.0%\t10.0%\nG10\t10.0%\t10.0%\t10.0%\n" ],
             "field_type": "textarea",
             "textarea_options": {
 		"n_rows": "11"
@@ -124,19 +124,19 @@
                 "options": [
                                 {
                                         "value": "FR",
-                                        "display": "FR:  ---> <---  e.g. Sanger, Illumina paired-end, IonTorrent mate-pair",
+                                        "display": "FR:  ---> <---   (e.g. Sanger, Illumina paired-end, IonTorrent mate-pair)",
                                         "id": "FR",
                                         "ui-name": "FR"
                                 },
                                 {
                                         "value": "FF",
-                                        "display": "FF:  ---> --->  e.g. 454",
+                                        "display": "FF:  ---> --->   (e.g. 454)",
                                         "id": "FF",
                                         "ui-name": "FF"
                                 },
                                 {
                                         "value": "RF",
-                                        "display": "RF:  <--- --->  e.g. Illumina mate-pair",
+                                        "display": "RF:  <--- --->   (e.g. Illumina mate-pair)",
                                         "id": "RF",
                                         "ui-name": "RF"
                                 },
@@ -324,7 +324,7 @@
             "optional": false,
             "advanced": true,
             "allow_multiple": false,
-            "default_values": [ "poly4 3e-3 3.3e-8" ],
+            "default_values": [ "1" ],
             "field_type": "dropdown",
             "dropdown_options": {
                 "options": [
