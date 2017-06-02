@@ -21,8 +21,8 @@ class kb_grinder:
     # the latter method is running.
     ######################################### noqa
     VERSION = "0.0.1"
-    GIT_URL = ""
-    GIT_COMMIT_HASH = ""
+    GIT_URL = "https://github.com/kbaseapps/kb_grinder.git"
+    GIT_COMMIT_HASH = "cd8c869514f1949bf3c1b336006b2e9bba860843"
 
     #BEGIN_CLASS_HEADER
     #END_CLASS_HEADER
@@ -38,9 +38,11 @@ class kb_grinder:
     def KButil_Build_InSilico_Metagenomes_with_Grinder(self, ctx, params):
         """
         :param params: instance of type
-           "KButil_Build_InSilico_Metagenomes_with_Grinder_Params" ->
-           structure: parameter "workspace_name" of type "workspace_name" (**
-           The workspace object refs are of form: ** **    objects =
+           "KButil_Build_InSilico_Metagenomes_with_Grinder_Params"
+           (KButil_Build_InSilico_Metagenomes_with_Grinder() ** **  Use
+           Grinder to generate in silico shotgun metagenomes) -> structure:
+           parameter "workspace_name" of type "workspace_name" (** The
+           workspace object refs are of form: ** **    objects =
            ws.get_objects([{'ref':
            params['workspace_id']+'/'+params['obj_name']}]) ** ** "ref" means
            the entire name combining the workspace id and the object name **
@@ -48,12 +50,16 @@ class kb_grinder:
            should just be used for workspace ** "name" is a string identifier
            of a workspace or object.  This is received from Narrative.),
            parameter "input_refs" of type "data_obj_ref", parameter
-           "output_name" of type "data_obj_name", parameter
-           "subsample_fraction" of type "InSilico_Reads_Options"
-           (KButil_Build_InSilico_Metagenomes_with_Grinder() ** **  Use
-           Grinder to generate in silico shotgun metagenomes) -> structure:
-           parameter "reads_num" of Long, parameter "population_percs" of
-           String, parameter "desc" of String, parameter "seed" of Long
+           "output_name" of type "data_obj_name", parameter "desc" of String,
+           parameter "num_reads_per_lib" of Long, parameter
+           "population_percs" of String, parameter "read_len_mean" of Long,
+           parameter "read_len_stddev" of Double, parameter "pairs_flag" of
+           Long, parameter "mate_orientation" of String, parameter
+           "insert_len_mean" of Long, parameter "insert_len_stddev" of
+           Double, parameter "mutation_dist" of String, parameter
+           "mutation_ratio" of String, parameter "qual_good" of Long,
+           parameter "qual_bad" of Long, parameter "len_bias_flag" of Long,
+           parameter "random_seed" of Long
         :returns: instance of type
            "KButil_Build_InSilico_Metagenomes_with_Grinder_Output" ->
            structure: parameter "report_name" of type "data_obj_name",

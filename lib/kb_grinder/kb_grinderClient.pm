@@ -127,15 +127,24 @@ KButil_Build_InSilico_Metagenomes_with_Grinder_Params is a reference to a hash w
 	workspace_name has a value which is a kb_grinder.workspace_name
 	input_refs has a value which is a kb_grinder.data_obj_ref
 	output_name has a value which is a kb_grinder.data_obj_name
-	subsample_fraction has a value which is a kb_grinder.InSilico_Reads_Options
 	desc has a value which is a string
-	seed has a value which is an int
+	num_reads_per_lib has a value which is an int
+	population_percs has a value which is a string
+	read_len_mean has a value which is an int
+	read_len_stddev has a value which is a float
+	pairs_flag has a value which is an int
+	mate_orientation has a value which is a string
+	insert_len_mean has a value which is an int
+	insert_len_stddev has a value which is a float
+	mutation_dist has a value which is a string
+	mutation_ratio has a value which is a string
+	qual_good has a value which is an int
+	qual_bad has a value which is an int
+	len_bias_flag has a value which is an int
+	random_seed has a value which is an int
 workspace_name is a string
 data_obj_ref is a string
 data_obj_name is a string
-InSilico_Reads_Options is a reference to a hash where the following keys are defined:
-	reads_num has a value which is an int
-	population_percs has a value which is a string
 KButil_Build_InSilico_Metagenomes_with_Grinder_Output is a reference to a hash where the following keys are defined:
 	report_name has a value which is a kb_grinder.data_obj_name
 	report_ref has a value which is a kb_grinder.data_obj_ref
@@ -152,15 +161,24 @@ KButil_Build_InSilico_Metagenomes_with_Grinder_Params is a reference to a hash w
 	workspace_name has a value which is a kb_grinder.workspace_name
 	input_refs has a value which is a kb_grinder.data_obj_ref
 	output_name has a value which is a kb_grinder.data_obj_name
-	subsample_fraction has a value which is a kb_grinder.InSilico_Reads_Options
 	desc has a value which is a string
-	seed has a value which is an int
+	num_reads_per_lib has a value which is an int
+	population_percs has a value which is a string
+	read_len_mean has a value which is an int
+	read_len_stddev has a value which is a float
+	pairs_flag has a value which is an int
+	mate_orientation has a value which is a string
+	insert_len_mean has a value which is an int
+	insert_len_stddev has a value which is a float
+	mutation_dist has a value which is a string
+	mutation_ratio has a value which is a string
+	qual_good has a value which is an int
+	qual_bad has a value which is an int
+	len_bias_flag has a value which is an int
+	random_seed has a value which is an int
 workspace_name is a string
 data_obj_ref is a string
 data_obj_name is a string
-InSilico_Reads_Options is a reference to a hash where the following keys are defined:
-	reads_num has a value which is an int
-	population_percs has a value which is a string
 KButil_Build_InSilico_Metagenomes_with_Grinder_Output is a reference to a hash where the following keys are defined:
 	report_name has a value which is a kb_grinder.data_obj_name
 	report_ref has a value which is a kb_grinder.data_obj_ref
@@ -452,7 +470,7 @@ an int
 
 
 
-=head2 InSilico_Reads_Options
+=head2 KButil_Build_InSilico_Metagenomes_with_Grinder_Params
 
 =over 4
 
@@ -471,44 +489,24 @@ KButil_Build_InSilico_Metagenomes_with_Grinder()
 
 <pre>
 a reference to a hash where the following keys are defined:
-reads_num has a value which is an int
-population_percs has a value which is a string
-
-</pre>
-
-=end html
-
-=begin text
-
-a reference to a hash where the following keys are defined:
-reads_num has a value which is an int
-population_percs has a value which is a string
-
-
-=end text
-
-=back
-
-
-
-=head2 KButil_Build_InSilico_Metagenomes_with_Grinder_Params
-
-=over 4
-
-
-
-=item Definition
-
-=begin html
-
-<pre>
-a reference to a hash where the following keys are defined:
 workspace_name has a value which is a kb_grinder.workspace_name
 input_refs has a value which is a kb_grinder.data_obj_ref
 output_name has a value which is a kb_grinder.data_obj_name
-subsample_fraction has a value which is a kb_grinder.InSilico_Reads_Options
 desc has a value which is a string
-seed has a value which is an int
+num_reads_per_lib has a value which is an int
+population_percs has a value which is a string
+read_len_mean has a value which is an int
+read_len_stddev has a value which is a float
+pairs_flag has a value which is an int
+mate_orientation has a value which is a string
+insert_len_mean has a value which is an int
+insert_len_stddev has a value which is a float
+mutation_dist has a value which is a string
+mutation_ratio has a value which is a string
+qual_good has a value which is an int
+qual_bad has a value which is an int
+len_bias_flag has a value which is an int
+random_seed has a value which is an int
 
 </pre>
 
@@ -520,9 +518,21 @@ a reference to a hash where the following keys are defined:
 workspace_name has a value which is a kb_grinder.workspace_name
 input_refs has a value which is a kb_grinder.data_obj_ref
 output_name has a value which is a kb_grinder.data_obj_name
-subsample_fraction has a value which is a kb_grinder.InSilico_Reads_Options
 desc has a value which is a string
-seed has a value which is an int
+num_reads_per_lib has a value which is an int
+population_percs has a value which is a string
+read_len_mean has a value which is an int
+read_len_stddev has a value which is a float
+pairs_flag has a value which is an int
+mate_orientation has a value which is a string
+insert_len_mean has a value which is an int
+insert_len_stddev has a value which is a float
+mutation_dist has a value which is a string
+mutation_ratio has a value which is a string
+qual_good has a value which is an int
+qual_bad has a value which is an int
+len_bias_flag has a value which is an int
+random_seed has a value which is an int
 
 
 =end text
