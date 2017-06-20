@@ -36,7 +36,7 @@ parameters :
             Enter Description
     input_refs:
         ui-name : |
-            Genomes
+            Genomes (order matters)
         short-hint : |
             Genomes to puree
     output_name:
