@@ -76,7 +76,7 @@ class kb_grinderTest(unittest.TestCase):
         return self.__class__.ctx
 
     # NOTE: According to Python unittest naming rules test method names should start from 'test'. # noqa
-    def test_your_method(self):
+    def test_kb_grinder_KButil_Build_InSilico_Metagenomes_with_Grinder_test_01(self):
         # Prepare test objects in workspace if needed using
         # self.getWsClient().save_objects({'workspace': self.getWsName(),
         #                                  'objects': []})
@@ -86,4 +86,32 @@ class kb_grinderTest(unittest.TestCase):
         #
         # Check returned data with
         # self.assertEqual(ret[...], ...) or other unittest methods
+
+        reference_prok_genomes_WS = '19217'
+        genome_ref_1 = '19217/84470/2'
+        genome_ref_2 = '19217/84522/2'
+        genome_ref_3 = '19217/84258/2'
+        
+        parameters = { 'workspace': self.getWsName(),
+                       'desc': 'test',
+                       'input_refs': [genome_ref_1, genome_ref_2, genome_ref_3],
+                       'output_name': 'foo.PERS',
+                       'num_reads_per_lib': '1000000',
+                       'population_percs': "Genome\tS1\tS2\tS3\tetc.\nG1\t10.0%\t10.0%\t10.0%\nG2\t10.0%\t10.0%\t10.0%\nG3\t10.0%\t10.0%\t10.0%\n",
+                       'read_len_mean': "150",
+                       'read_len_stddev': "0.0",
+                       'pairs_flag': "1",
+                       'mate_orientation': "FR",
+                       'insert_len_mean': "2500",
+                       'insert_len_stddev': "200",
+                       'mutation_dist': "poly4 3e-3 3.3e-8",
+                       'mutation_ratio': "80 20",
+                       'qual_good': "30",
+                       'qual_bad': "10",
+                       'len_bias_flag': "1",
+                       'random_seed': "1"
+                     }
+
+        ret = self.getImpl().KButil_Build_InSilico_Metagenomes_with_Grinder(self.getContext(), parameters)
+
         pass
