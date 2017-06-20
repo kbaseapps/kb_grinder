@@ -168,6 +168,7 @@ class kb_grinder:
         ##
         accepted_input_types = ["KBaseGenomes.Genome"]
         genome_refs = params['input_refs']
+        #genome_refs = ['21855/9/1', '21855/8/1', '21855/7/1']    # DEBUG
         genome_obj_names = []
         genome_sci_names = []
         scaffold_refs = dict()
@@ -194,11 +195,11 @@ class kb_grinder:
             scaffold_refs[input_ref] = []
             if ('contigset_ref' not in genome_obj or genome_obj['contigset_ref'] == None) \
                     and ('assembly_ref' not in genome_obj or genome_obj['assembly_ref'] == None):
-                raise ValueError ("Genome "+genome_obj_name[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" MISSING BOTH contigset_ref AND assembly_ref")
+                raise ValueError ("Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" MISSING BOTH contigset_ref AND assembly_ref")
             elif 'assembly_ref' in genome_obj and genome_obj['assembly_ref'] != None:
-                self.log (console, "Genome "+genome_obj_name[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING assembly_ref")
+                self.log (console, "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING assembly_ref")
             elif 'contigset_ref' in genome_obj and genome_obj['contigset_ref'] != None:
-                self.log (console, "Genome "+genome_obj_name[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING contigset_ref")
+                self.log (console, "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING contigset_ref")
 
 
         # build report
@@ -211,7 +212,7 @@ class kb_grinder:
                      'direct_html_link_index': 0,
                      'file_links': [],
                      'html_links': [],
-                     'workspace_name': params['workspace_name'],
+                     'workspace_name': params['workspace'],
                      'report_object_name': reportName
                      }
 
@@ -243,7 +244,7 @@ class kb_grinder:
         #report_info = report.create({'report':reportObj, 'workspace_name':params['workspace_name']})
         report_info = reportClient.create_extended_report(reportObj)
 
-        output = { 'report_name': report_info['name'], 'report_ref': report_info['ref'] }
+        returnVal = { 'report_name': report_info['name'], 'report_ref': report_info['ref'] }
         #END KButil_Build_InSilico_Metagenomes_with_Grinder
 
         # At some point might do deeper type checking...
