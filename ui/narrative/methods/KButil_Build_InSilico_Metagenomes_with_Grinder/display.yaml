@@ -1,7 +1,7 @@
 #
 # define display information
 #
-name: Build InSilico Metagenomes with Grinder v0.5.4
+name: Build InSilico Metagenomes with Grinder - v0.5.4
 tooltip: |
     Generate In Silico reads from microbial genomes following input proportions
 screenshots: []
