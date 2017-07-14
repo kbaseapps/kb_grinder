@@ -21,6 +21,7 @@ import math
 from Bio import SeqIO
 
 from biokbase.workspace.client import Workspace as workspaceService
+from AssemblyUtil.AssemblyUtilClient import AssemblyUtil
 from DataFileUtil.DataFileUtilClient import DataFileUtil as DFUClient
 from KBaseReport.KBaseReportClient import KBaseReport
 
@@ -49,6 +50,8 @@ class kb_grinder:
     GIT_COMMIT_HASH = "77a95c1c911a4e21ccead89151cf30b86d181a25"
 
     #BEGIN_CLASS_HEADER
+
+    self.GRINDER = '/usr/local/bin/grinder'
 
     def log(self, target, message):
         if target is not None:
@@ -110,9 +113,11 @@ class kb_grinder:
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN KButil_Build_InSilico_Metagenomes_with_Grinder
+
         #### STEP 0: basic init
         ##
         console = []
+        invalid_msgs = []
         self.log(console, 'Running KButil_Build_InSilico_Metagenomes_with_Grinder(): ')
         self.log(console, "\n"+pformat(params))
 
@@ -147,7 +152,6 @@ class kb_grinder:
             if arg not in params or params[arg] == None or params[arg] == '':
                 raise ValueError ("Must define required param: '"+arg+"'")
 
-
         # load provenance
         provenance = [{}]
         if 'provenance' in ctx:
@@ -156,22 +160,65 @@ class kb_grinder:
         for input_ref in params['input_refs']:
             provenance[0]['input_ws_objects'].append(input_ref)
 
-
-        # set the output path
+        # set the output paths
         timestamp = int((datetime.utcnow() - datetime.utcfromtimestamp(0)).total_seconds()*1000)
         output_dir = os.path.join(self.scratch,'output.'+str(timestamp))
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
+        html_output_dir = os.path.join(output_dir,'html')
+        if not os.path.exists(html_output_dir):
+            os.makedirs(html_output_dir)
 
 
-        #### STEP 1: get genome scaffold sequences
+        #### STEP 1: Parse population_percs and write to file
         ##
+        abundance_str = params['population_percs'].strip()
+        abundance_file_path = os.path.join(output_dir,'my_abundances.txt')
+        abundance_config_num_libs = 0
+        abundance_config_num_libs_set = False
+        grinder_genome_ids = []
+        out_buf = []
+
+        for row in abundance_str.split("\n"):
+            cols = row.split()
+            if cols[0].upper() == "GENOME":
+                continue
+            grinder_genome_ids.append(cols[0])
+            self.log(console, "GRINDER GENOME ID: '"+cols[0]+"'")  # DEBUG
+            out_row = []
+            for col in cols:
+                if col == '':
+                    continue
+                elif col == '%':
+                    continue
+                elif col.endswith('%'):
+                    col = col.rstrip('%')
+                out_row.append(col)
+            out_buf.append("\t".join(out_row))
+            if not abundance_config_num_libs_set:
+                abundance_config_num_libs_set = True
+                abundance_config_num_libs = len(out_row) - 1  # first col is genome id
+
+        with open(abundance_file_path, 'w') as abundance_fh:
+            for out_line in out_buf:
+                abundance_fh.write(out_line+"\n")
+        # DEBUG
+        with open(abundance_file_path, 'r') as abundance_fh:
+            for out_line in abundance_fh.readlines():
+                out_line = out_line.rstrip()
+                self.log(console, "ABUNDANCE_CONFIG: '"+out_line+"'")
+
+
+        #### STEP 2: get genome scaffold sequences
+        ##
+        genomes_src_db_file_path = os.path.join (output_dir, 'genomes.fna')
+        read_buf_size  = 65536
+        write_buf_size = 65536
         accepted_input_types = ["KBaseGenomes.Genome"]
         genome_refs = params['input_refs']
-        #genome_refs = ['21855/9/1', '21855/8/1', '21855/7/1']    # DEBUG
         genome_obj_names = []
         genome_sci_names = []
-        scaffold_refs = dict()
+        assembly_refs    = []
         
         for i,input_ref in enumerate(genome_refs):
             try:
@@ -191,19 +238,156 @@ class kb_grinder:
             except:
                 raise ValueError ("unable to fetch genome: "+input_ref)
 
-            # Get sequences
-            scaffold_refs[input_ref] = []
+            # Get assembly_refs
             if ('contigset_ref' not in genome_obj or genome_obj['contigset_ref'] == None) \
                     and ('assembly_ref' not in genome_obj or genome_obj['assembly_ref'] == None):
-                raise ValueError ("Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" MISSING BOTH contigset_ref AND assembly_ref")
+                msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" MISSING BOTH contigset_ref AND assembly_ref.  Cannot process.  Exiting."
+                self.log(console, msg)
+                self.log(invalid_msgs, msg)
+                continue
             elif 'assembly_ref' in genome_obj and genome_obj['assembly_ref'] != None:
-                self.log (console, "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING assembly_ref")
+                msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING assembly_ref: "+str(genome_obj['assembly_ref'])
+                self.log (console, msg)
+                assembly_refs.append(genome_obj['assembly_ref'])
             elif 'contigset_ref' in genome_obj and genome_obj['contigset_ref'] != None:
-                self.log (console, "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING contigset_ref")
+                msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING contigset_ref: "+str(genome_obj['contigset_ref'])
+                self.log (console, msg)
+                assembly_refs.append(genome_obj['contigset_ref'])
+
+        # get fastas for scaffolds
+        contig_file_paths = []
+        if len(invalid_msgs) > 0:
+            report_text = "\n".join(invalid_msgs)
+        else:
+            SERVICE_VER='release'
+            auClient = AssemblyUtil(self.callbackURL, token=ctx['token'], service_ver=SERVICE_VER)
+            dfu = DFUClient(self.callbackURL)
+
+            for genome_i,input_ref in enumerate(genome_refs):
+                contig_file = auClient.get_assembly_as_fasta({'ref':assembly_refs[genome_i]}).get('path')
+                sys.stdout.flush()
+                contig_file_path = dfu.unpack_file({'file_path': contig_file})['file_path']
+                contig_file_paths.append(contig_file_path)
+
+            # reformat FASTA IDs for Grinder
+            #     TODO: Combine contigs into single sequence record per genome?  Is that required for Grinder?  CHECK!
+            with open (genomes_src_db_file_path, 'w', write_buf_size) as genomes_src_db_fh:
+                for genome_i,contig_file_path in enumerate(contig_file_paths):
+                    #self.log(console,str(genome_i)+" CONTIG_FILE: "+contig_file_path)  # DEBUG
+                    #contig_ids = []
+                    with open (contig_file_path, 'r', read_buf_size) as contig_fh:
+                        for contig_line in contig_fh.readlines():
+                            if contig_line.startswith('>'):
+                                #contig_id = contig_line.strip()[1:].split(' ')[0]
+                                #contig_ids.append(contig_id)
+                                genomes_src_db_fh.write(">"+grinder_genome_ids[genome_i]+"\n")
+                            else:
+                                genomes_src_db_fh.write(contig_line)
+                    #for contig_id in contig_ids:
+                    #    self.log(console, "\tCONTIG_ID: "+contig_id)  # DEBUG
+            # DEBUG
+            #toggle = 0
+            #with open (genomes_src_db_file_path, 'r', write_buf_size) as genomes_src_db_fh:
+            #    for contig_line in genomes_src_db_fh.readlines():
+            #        contig_line = contig_line.rstrip()
+            #        if contig_line.startswith('>'):
+            #            self.log(console, 'GENOMES_SRC_DB: '+contig_line)
+            #            toggle = 0
+            #        elif toggle == 0:
+            #            self.log(console, 'GENOMES_SRC_DB: '+contig_line[0:50])
+            #            toggle += 1
 
 
-        # build report
-        #
+        #### STEP 3: Run Grinder
+        ##
+        if len(invalid_msgs) == 0:
+            cmd = []
+            cmd.append (self.GRINDER)
+            # output
+            cmd.append ('-base_name')
+            cmd.append (params['output_name'])
+            cmd.append ('-output_dir')
+            cmd.append (output_dir)
+            # contigs input
+            cmd.append ('-reference_file')
+            cmd.append (genomes_src_db_file_path)
+            # abundances
+            cmd.append ('-abundance_file')
+            cmd.append (abundance_file_path)
+            # library size
+            cmd.append ('-total_reads')
+            cmd.append (str(params['num_reads_per_lib']))
+            # num libraries (overridden by abundance file?)
+            cmd.append ('-num_libraries')
+            cmd.append (str(abundance_config_num_libs))
+            # read and insert lens
+            cmd.append ('-read_dist')
+            cmd.append (str(params['read_len_mean']))
+            cmd.append ('normal')
+            cmd.append (str(params['read_len_stddev']))
+            cmd.append ('-insert_dist')
+            cmd.append (str(params['insert_len_mean']))
+            cmd.append ('normal')
+            cmd.append (str(params['insert_len_stddev']))
+            # mate orientation
+            if params['pairs_flag'] == 1:
+                cmd.append ('-mate_orientation')
+                cmd.append (params['mate_orientation'])
+            # genome len bias
+            cmd.append ('-length_bias')
+            cmd.append (str(params['len_bias_flag']))
+            # mutation model
+            cmd.append ('-mutation_dist')
+            cmd.append (str(params['mutation_dist']))
+            cmd.append ('-mutation_ratio')
+            cmd.append (str(params['mutation_ratio']))
+            # qual scores
+            cmd.append ('-fastq_output')
+            cmd.append ('1')
+            cmd.append ('-qual_levels')
+            cmd.append (str(params['qual_good']))
+            cmd.append (str(params['qual_bad']))
+            # skip contig joins
+            cmd.append ('-exclude_chars')
+            cmd.append ('NX')
+            # random seed
+            if 'random_seed' in params and params['random_seed'] != None and params['random_seed'] != '':
+                cmd.append ('-random_seed')
+                cmd.append (str(params['random_seed']))
+
+
+            # RUN
+            cmd_str = " ".join(cmd)
+            self.log (console, "RUNNING: "+cmd_str)
+            cmdProcess = subprocess.Popen(cmd_str, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            
+            outputlines = []
+            while True:
+                line = cmdProcess.stdout.readline()
+                outputlines.append(line)
+                if not line: break
+                self.log(console, line.replace('\n', ''))
+                
+            cmdProcess.stdout.close()
+            cmdProcess.wait()
+            self.log(console, 'return code: ' + str(cmdProcess.returncode) + '\n')
+            if cmdProcess.returncode != 0:
+                raise ValueError('Error running kb_trimmomatic, return code: ' +
+                                 str(cmdProcess.returncode) + '\n')
+
+
+            report += "\n".join(outputlines)
+            #report += "cmdstring: " + cmdstring + " stdout: " + stdout + " stderr " + stderr
+
+
+        #### STEP 4: Upload results
+        ##
+        if len(invalid_msgs) == 0:
+
+            
+
+        #### STEP 5: Build report
+        ##
         reportName = 'kb_grinder_report_'+str(uuid.uuid4())
         reportObj = {'objects_created': [],
                      #'text_message': '',  # or is it 'message'?
@@ -215,6 +399,10 @@ class kb_grinder:
                      'workspace_name': params['workspace'],
                      'report_object_name': reportName
                      }
+
+        if len(invalid_msgs) > 0:
+            reportObj['message'] = report_text
+
 
 	# ADD REPORT HTML HERE
         #html_report_str = "\n".join(html_report_lines)
