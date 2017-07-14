@@ -100,7 +100,7 @@ class kb_grinderTest(unittest.TestCase):
                        'desc': 'test',
                        'input_refs': [genome_ref_1, genome_ref_2, genome_ref_3],
                        'output_name': 'foo.PERS',
-                       'num_reads_per_lib': '1000000',
+                       'num_reads_per_lib': '1000',
                        'population_percs': "Genome\tS1\tS2\tS3\tetc.\nG1\t10.0%\t60.0%\t35.0%\nG2\t30.0%\t30.0%\t30.0%\nG3\t60.0%\t10.0%\t35.0%\n",
                        'read_len_mean': "150",
                        'read_len_stddev': "15.0",
