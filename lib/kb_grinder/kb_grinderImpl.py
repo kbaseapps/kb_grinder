@@ -118,6 +118,7 @@ class kb_grinder:
         ##
         console = []
         invalid_msgs = []
+        report_text = ''
         self.log(console, 'Running KButil_Build_InSilico_Metagenomes_with_Grinder(): ')
         self.log(console, "\n"+pformat(params))
 
@@ -276,6 +277,7 @@ class kb_grinder:
                     #contig_ids = []
                     with open (contig_file_path, 'r', read_buf_size) as contig_fh:
                         genome_seq = ''
+                        contig_seq = ''
                         contig_seqs = []
                         for contig_line in contig_fh.readlines():
                             contig_line = contig_line.rstrip()
@@ -283,30 +285,43 @@ class kb_grinder:
                                 #contig_id = contig_line.strip()[1:].split(' ')[0]
                                 #contig_ids.append(contig_id)
                                 #genomes_src_db_fh.write(">"+grinder_genome_ids[genome_i]+"\n")
+                                if contig_seq != '':
+                                    contig_seqs.append (contig_seq)
+                                contig_seq = ''
                                 continue
                             else:
                                 #genomes_src_db_fh.write(contig_line)
-                                contig_seqs.append (contig_line)
-                    # NOTE: Using "-exclude_chars" grinder opt on X to avoid contig joins
-                    genome_seq = "XXXXXXXXXX".join(contig_seqs)  
+                                contig_seq += contig_line
+                        if contig_seq != '':
+                            contig_seqs.append (contig_seq)
+                        contig_seq = ''
+                    
+                    # write joined contigs to file
+                    genome_seq = "NNNNNNNNNN".join(contig_seqs)  # NOTE: Using "-exclude_chars" grinder opt on N to avoid contig joins
+                    genome_seq = genome_seq.upper()  # grinder might require upper case?
                     genomes_src_db_fh.write(">"+grinder_genome_ids[genome_i]+"\n")
                     genomes_src_db_fh.write(genome_seq+"\n")
                     genome_seq = ''
                     contig_seqs = []
 
+            """
+                    # DEBUG
                     #for contig_id in contig_ids:
                     #    self.log(console, "\tCONTIG_ID: "+contig_id)  # DEBUG
             # DEBUG
-            #toggle = 0
-            #with open (genomes_src_db_file_path, 'r', write_buf_size) as genomes_src_db_fh:
-            #    for contig_line in genomes_src_db_fh.readlines():
-            #        contig_line = contig_line.rstrip()
-            #        if contig_line.startswith('>'):
-            #            self.log(console, 'GENOMES_SRC_DB: '+contig_line)
-            #            toggle = 0
-            #        elif toggle == 0:
-            #            self.log(console, 'GENOMES_SRC_DB: '+contig_line[0:50])
-            #            toggle += 1
+            toggle = 0
+            with open (genomes_src_db_file_path, 'r', write_buf_size) as genomes_src_db_fh:
+                for contig_line in genomes_src_db_fh.readlines():
+                    contig_line = contig_line.rstrip()
+                    if contig_line.startswith('>'):
+                        self.log(console, 'GENOMES_SRC_DB: '+contig_line)
+                        genome_id = contig_line[1:]
+                        #toggle = 0
+                    #elif toggle == 0:
+                    elif genome_id == 'G3':
+                        self.log(console, 'GENOMES_SRC_DB: '+contig_line[0:10000])
+                        #toggle += 1
+            """
 
 
         #### STEP 3: Run Grinder
@@ -336,12 +351,12 @@ class kb_grinder:
             cmd.append (str(params['read_len_mean']))
             cmd.append ('normal')
             cmd.append (str(params['read_len_stddev']))
-            cmd.append ('-insert_dist')
-            cmd.append (str(params['insert_len_mean']))
-            cmd.append ('normal')
-            cmd.append (str(params['insert_len_stddev']))
-            # mate orientation
             if params['pairs_flag'] == 1:
+                cmd.append ('-insert_dist')
+                cmd.append (str(params['insert_len_mean']))
+                cmd.append ('normal')
+                cmd.append (str(params['insert_len_stddev']))
+                # mate orientation
                 cmd.append ('-mate_orientation')
                 cmd.append (params['mate_orientation'])
             # genome len bias
@@ -361,6 +376,9 @@ class kb_grinder:
             # skip contig joins
             cmd.append ('-exclude_chars')
             cmd.append ('NX')
+            # explicitly request bidirectional
+            cmd.append ('-unidirectional')
+            cmd.append ('0')
             # random seed
             if 'random_seed' in params and params['random_seed'] != None and params['random_seed'] != '':
                 cmd.append ('-random_seed')
@@ -369,9 +387,11 @@ class kb_grinder:
 
             # RUN
             cmd_str = " ".join(cmd)
+            self.log (console, "\n===========================================================")
             self.log (console, "RUNNING: "+cmd_str)
+            self.log (console, "===========================================================\n")
+
             cmdProcess = subprocess.Popen(cmd_str, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
-            
             outputlines = []
             while True:
                 line = cmdProcess.stdout.readline()
@@ -383,12 +403,12 @@ class kb_grinder:
             cmdProcess.wait()
             self.log(console, 'return code: ' + str(cmdProcess.returncode) + '\n')
             if cmdProcess.returncode != 0:
-                raise ValueError('Error running kb_trimmomatic, return code: ' +
+                raise ValueError('Error running kb_grinder, return code: ' +
                                  str(cmdProcess.returncode) + '\n')
 
 
-            report += "\n".join(outputlines)
-            #report += "cmdstring: " + cmdstring + " stdout: " + stdout + " stderr " + stderr
+            report_text += "\n".join(outputlines)
+            #report_text += "cmdstring: " + cmdstring + " stdout: " + stdout + " stderr " + stderr
 
 
         #### STEP 4: Upload results
@@ -411,8 +431,8 @@ class kb_grinder:
                      'report_object_name': reportName
                      }
 
-        if len(invalid_msgs) > 0:
-            reportObj['message'] = report_text
+        #if len(invalid_msgs) > 0:
+        reportObj['message'] = report_text
 
 
 	# ADD REPORT HTML HERE
