@@ -406,15 +406,64 @@ class kb_grinder:
                 raise ValueError('Error running kb_grinder, return code: ' +
                                  str(cmdProcess.returncode) + '\n')
 
-
-            report_text += "\n".join(outputlines)
+            #report_text += "\n".join(outputlines)
             #report_text += "cmdstring: " + cmdstring + " stdout: " + stdout + " stderr " + stderr
 
+            # capture output for report and paths to out files
+            report_text_buf   = []
+            struct_file_paths = []
+            fastq_file_paths  = []
+            for out_line in outputlines:
+                if 'Community structure' in out_line:
+                    clean_line = out_line.strip()
+                    struct_file_paths.append (clean_line.split()[2])
+                elif 'FASTQ file' in out_line:
+                    clean_line = out_line.strip()
+                    fastq_file_paths.append (clean_line.split()[2])
+                else:
+                    report_text_buf.append (out_line)
+            report_text += "\n".join(report_text_buf)
 
-        #### STEP 4: Upload results
+
+        #### STEP 4: Upload Read Libs
         ##
-        #if len(invalid_msgs) == 0:
+        if len(invalid_msgs) == 0:
+            lib_obj_refs = []
+            lib_obj_names = []
+            for sample_i,fastq_file_path in enumerate(fastq_file_paths):
 
+                if not os.path.isfile (fastq_file_path) \
+                   or os.path.getsize (fastq_file_path) == 0:
+
+                    raise ValueError ("empty read lib generated: "+fastq_file_path)
+                else:
+
+                    # lib obj name
+                    if len(fastq_file_paths) == 0:
+                        output_obj_name = input_params['output_name']
+                    else:
+                        if params['pair_flag'] == 1:
+                            output_obj_name = input_params['output_name']+'-'+str(sample_i+1)+".PairedEndLib"
+                        else:
+                            output_obj_name = input_params['output_name']+'-'+str(sample_i+1)+".SingleEndLib"
+                    lib_obj_names.append (output_obj_name)
+
+                    # upload lib and get obj ref
+                    self.log(console, 'Uploading trimmed paired reads: '+output_obj_name)
+                    sequencing_tech = 'artificial reads'
+                    if params['pair_flag'] == 1:
+                        interleaved = 1
+                    else:
+                        interleaved = 0
+                    lib_obj_refs.append (readsUtils_Client.upload_reads ({ 'wsname': str(params['workspace_name']),
+                                                                           'name': output_obj_name,
+                                                                           'fwd_file': output_fwd_paired_file_path,
+                                                                           'interleaved': interleaved,
+                                                                           'sequencing_tech': sequencing_tech
+                                                                       })['obj_ref'])
+
+                    os.remove(fastq_file_path)  # free up disk
+            
             
 
         #### STEP 5: Build report
