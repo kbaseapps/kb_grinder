@@ -54,9 +54,10 @@ class kb_grinder:
     GRINDER = '/usr/local/bin/grinder'
 
     def log(self, target, message):
+        timestamp = str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3])
         if target is not None:
-            target.append(message)
-        print(message)
+            target.append('['+timestamp+'] '+message)
+        print('['+timestamp+'] '+message)
         sys.stdout.flush()
 
     #END_CLASS_HEADER
@@ -181,7 +182,7 @@ class kb_grinder:
         out_buf = []
 
         for row in abundance_str.split("\n"):
-            cols = row.split()
+            cols = re.split(r'\s+',row)
             if cols[0].upper() == "GENOME":
                 continue
             grinder_genome_ids.append(cols[0])
@@ -196,18 +197,24 @@ class kb_grinder:
                     col = col.rstrip('%')
                 out_row.append(col)
             out_buf.append("\t".join(out_row))
+            num_samples = len(out_row) - 1  # first col is genome id
             if not abundance_config_num_libs_set:
                 abundance_config_num_libs_set = True
-                abundance_config_num_libs = len(out_row) - 1  # first col is genome id
+                abundance_config_num_libs = num_samples
+            elif num_samples != abundance_config_num_libs:
+                invalid_msgs.append ("inconsistent number of samples in population_percs input field")
+        if abundance_config_num_libs == 0:
+            invalid_msgs.append ("unable to find sample percentages in population_percs input field")
 
-        with open(abundance_file_path, 'w') as abundance_fh:
-            for out_line in out_buf:
-                abundance_fh.write(out_line+"\n")
-        # DEBUG
-        with open(abundance_file_path, 'r') as abundance_fh:
-            for out_line in abundance_fh.readlines():
-                out_line = out_line.rstrip()
-                self.log(console, "ABUNDANCE_CONFIG: '"+out_line+"'")
+        if len(invalid_msgs) == 0:
+            with open(abundance_file_path, 'w') as abundance_fh:
+                for out_line in out_buf:
+                    abundance_fh.write(out_line+"\n")
+            # DEBUG
+            with open(abundance_file_path, 'r') as abundance_fh:
+                for out_line in abundance_fh.readlines():
+                    out_line = out_line.rstrip()
+                    self.log(console, "ABUNDANCE_CONFIG: '"+out_line+"'")
 
 
         #### STEP 2: get genome scaffold sequences
@@ -221,45 +228,44 @@ class kb_grinder:
         genome_sci_names = []
         assembly_refs    = []
         
-        for i,input_ref in enumerate(genome_refs):
-            try:
-                [OBJID_I, NAME_I, TYPE_I, SAVE_DATE_I, VERSION_I, SAVED_BY_I, WSID_I, WORKSPACE_I, CHSUM_I, SIZE_I, META_I] = range(11)  # object_info tuple
-                input_obj_info = wsClient.get_object_info_new ({'objects':[{'ref':input_ref}]})[0]
-                input_obj_type = re.sub ('-[0-9]+\.[0-9]+$', "", input_obj_info[TYPE_I])  # remove trailing version
-                genome_obj_names.append(input_obj_info[NAME_I])
+        if len(invalid_msgs) == 0:
+            for i,input_ref in enumerate(genome_refs):
+                try:
+                    [OBJID_I, NAME_I, TYPE_I, SAVE_DATE_I, VERSION_I, SAVED_BY_I, WSID_I, WORKSPACE_I, CHSUM_I, SIZE_I, META_I] = range(11)  # object_info tuple
+                    input_obj_info = wsClient.get_object_info_new ({'objects':[{'ref':input_ref}]})[0]
+                    input_obj_type = re.sub ('-[0-9]+\.[0-9]+$', "", input_obj_info[TYPE_I])  # remove trailing version
+                    genome_obj_names.append(input_obj_info[NAME_I])
 
-            except Exception as e:
-                raise ValueError('Unable to get object from workspace: (' + input_ref +')' + str(e))
-            if input_obj_type not in accepted_input_types:
-                raise ValueError ("Input object of type '"+input_obj_type+"' not accepted.  Must be one of "+", ".join(accepted_input_types))
+                except Exception as e:
+                    raise ValueError('Unable to get object from workspace: (' + input_ref +')' + str(e))
+                if input_obj_type not in accepted_input_types:
+                    raise ValueError ("Input object of type '"+input_obj_type+"' not accepted.  Must be one of "+", ".join(accepted_input_types))
 
-            try:
-                genome_obj = wsClient.get_objects([{'ref':input_ref}])[0]['data']
-                genome_sci_names.append(genome_obj['scientific_name'])
-            except:
-                raise ValueError ("unable to fetch genome: "+input_ref)
+                try:
+                    genome_obj = wsClient.get_objects([{'ref':input_ref}])[0]['data']
+                    genome_sci_names.append(genome_obj['scientific_name'])
+                except:
+                    raise ValueError ("unable to fetch genome: "+input_ref)
 
-            # Get assembly_refs
-            if ('contigset_ref' not in genome_obj or genome_obj['contigset_ref'] == None) \
-                    and ('assembly_ref' not in genome_obj or genome_obj['assembly_ref'] == None):
-                msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" MISSING BOTH contigset_ref AND assembly_ref.  Cannot process.  Exiting."
-                self.log(console, msg)
-                self.log(invalid_msgs, msg)
-                continue
-            elif 'assembly_ref' in genome_obj and genome_obj['assembly_ref'] != None:
-                msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING assembly_ref: "+str(genome_obj['assembly_ref'])
-                self.log (console, msg)
-                assembly_refs.append(genome_obj['assembly_ref'])
-            elif 'contigset_ref' in genome_obj and genome_obj['contigset_ref'] != None:
-                msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING contigset_ref: "+str(genome_obj['contigset_ref'])
-                self.log (console, msg)
-                assembly_refs.append(genome_obj['contigset_ref'])
+                # Get assembly_refs
+                if ('contigset_ref' not in genome_obj or genome_obj['contigset_ref'] == None) \
+                   and ('assembly_ref' not in genome_obj or genome_obj['assembly_ref'] == None):
+                    msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" MISSING BOTH contigset_ref AND assembly_ref.  Cannot process.  Exiting."
+                    self.log(console, msg)
+                    self.log(invalid_msgs, msg)
+                    continue
+                elif 'assembly_ref' in genome_obj and genome_obj['assembly_ref'] != None:
+                    msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING assembly_ref: "+str(genome_obj['assembly_ref'])
+                    self.log (console, msg)
+                    assembly_refs.append(genome_obj['assembly_ref'])
+                elif 'contigset_ref' in genome_obj and genome_obj['contigset_ref'] != None:
+                    msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING contigset_ref: "+str(genome_obj['contigset_ref'])
+                    self.log (console, msg)
+                    assembly_refs.append(genome_obj['contigset_ref'])
 
         # get fastas for scaffolds
         contig_file_paths = []
-        if len(invalid_msgs) > 0:
-            report_text = "\n".join(invalid_msgs)
-        else:
+        if len(invalid_msgs) == 0:
             SERVICE_VER='release'
             auClient = AssemblyUtil(self.callbackURL, token=ctx['token'], service_ver=SERVICE_VER)
             dfu = DFUClient(self.callbackURL)
@@ -287,15 +293,15 @@ class kb_grinder:
                                 #genomes_src_db_fh.write(">"+grinder_genome_ids[genome_i]+"\n")
                                 if contig_seq != '':
                                     contig_seqs.append (contig_seq)
-                                contig_seq = ''
-                                continue
-                            else:
-                                #genomes_src_db_fh.write(contig_line)
-                                contig_seq += contig_line
-                        if contig_seq != '':
-                            contig_seqs.append (contig_seq)
-                        contig_seq = ''
-                    
+                                    contig_seq = ''
+                                    continue
+                                else:
+                                    #genomes_src_db_fh.write(contig_line)
+                                    contig_seq += contig_line
+                                    if contig_seq != '':
+                                        contig_seqs.append (contig_seq)
+                                        contig_seq = ''
+                                        
                     # write joined contigs to file
                     genome_seq = "NNNNNNNNNN".join(contig_seqs)  # NOTE: Using "-exclude_chars" grinder opt on N to avoid contig joins
                     genome_seq = genome_seq.upper()  # grinder might require upper case?
@@ -304,7 +310,6 @@ class kb_grinder:
                     genome_seq = ''
                     contig_seqs = []
 
-            """
                     # DEBUG
                     #for contig_id in contig_ids:
                     #    self.log(console, "\tCONTIG_ID: "+contig_id)  # DEBUG
@@ -316,12 +321,11 @@ class kb_grinder:
                     if contig_line.startswith('>'):
                         self.log(console, 'GENOMES_SRC_DB: '+contig_line)
                         genome_id = contig_line[1:]
-                        #toggle = 0
-                    #elif toggle == 0:
-                    elif genome_id == 'G3':
+                        toggle = 0
+                    elif toggle == 0:
+                    #elif genome_id == 'G3':
                         self.log(console, 'GENOMES_SRC_DB: '+contig_line[0:10000])
-                        #toggle += 1
-            """
+                        toggle += 1
 
 
         #### STEP 3: Run Grinder
@@ -416,10 +420,10 @@ class kb_grinder:
             for out_line in outputlines:
                 if 'Community structure' in out_line:
                     clean_line = out_line.strip()
-                    struct_file_paths.append (clean_line.split()[2])
+                    struct_file_paths.append (re.split(r'\s+',clean_line)[2])
                 elif 'FASTQ file' in out_line:
                     clean_line = out_line.strip()
-                    fastq_file_paths.append (clean_line.split()[2])
+                    fastq_file_paths.append (re.split(r'\s+',clean_line)[2])
                 else:
                     report_text_buf.append (out_line)
             report_text += "\n".join(report_text_buf)
@@ -480,7 +484,9 @@ class kb_grinder:
                      'report_object_name': reportName
                      }
 
-        #if len(invalid_msgs) > 0:
+        if len(invalid_msgs) > 0:
+            report_text = "\n".join(invalid_msgs)
+
         reportObj['message'] = report_text
 
 
