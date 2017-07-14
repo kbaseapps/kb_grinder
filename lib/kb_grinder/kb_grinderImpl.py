@@ -50,8 +50,8 @@ class kb_grinder:
     GIT_COMMIT_HASH = "77a95c1c911a4e21ccead89151cf30b86d181a25"
 
     #BEGIN_CLASS_HEADER
-
-    self.GRINDER = '/usr/local/bin/grinder'
+    workspaceURL = None
+    GRINDER = '/usr/local/bin/grinder'
 
     def log(self, target, message):
         if target is not None:
@@ -270,19 +270,30 @@ class kb_grinder:
                 contig_file_paths.append(contig_file_path)
 
             # reformat FASTA IDs for Grinder
-            #     TODO: Combine contigs into single sequence record per genome?  Is that required for Grinder?  CHECK!
             with open (genomes_src_db_file_path, 'w', write_buf_size) as genomes_src_db_fh:
                 for genome_i,contig_file_path in enumerate(contig_file_paths):
                     #self.log(console,str(genome_i)+" CONTIG_FILE: "+contig_file_path)  # DEBUG
                     #contig_ids = []
                     with open (contig_file_path, 'r', read_buf_size) as contig_fh:
+                        genome_seq = ''
+                        contig_seqs = []
                         for contig_line in contig_fh.readlines():
+                            contig_line = contig_line.rstrip()
                             if contig_line.startswith('>'):
                                 #contig_id = contig_line.strip()[1:].split(' ')[0]
                                 #contig_ids.append(contig_id)
-                                genomes_src_db_fh.write(">"+grinder_genome_ids[genome_i]+"\n")
+                                #genomes_src_db_fh.write(">"+grinder_genome_ids[genome_i]+"\n")
+                                continue
                             else:
-                                genomes_src_db_fh.write(contig_line)
+                                #genomes_src_db_fh.write(contig_line)
+                                contig_seqs.append (contig_line)
+                    # NOTE: Using "-exclude_chars" grinder opt on X to avoid contig joins
+                    genome_seq = "XXXXXXXXXX".join(contig_seqs)  
+                    genomes_src_db_fh.write(">"+grinder_genome_ids[genome_i]+"\n")
+                    genomes_src_db_fh.write(genome_seq+"\n")
+                    genome_seq = ''
+                    contig_seqs = []
+
                     #for contig_id in contig_ids:
                     #    self.log(console, "\tCONTIG_ID: "+contig_id)  # DEBUG
             # DEBUG
@@ -382,7 +393,7 @@ class kb_grinder:
 
         #### STEP 4: Upload results
         ##
-        if len(invalid_msgs) == 0:
+        #if len(invalid_msgs) == 0:
 
             
 
