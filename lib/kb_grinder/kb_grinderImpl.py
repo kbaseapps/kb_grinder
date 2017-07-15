@@ -473,7 +473,7 @@ class kb_grinder:
                         interleaved = 0
                     lib_obj_refs.append (readsUtils_Client.upload_reads ({ 'wsname': str(params['workspace_name']),
                                                                            'name': output_obj_name,
-                                                                           'fwd_file': output_fwd_paired_file_path,
+                                                                           'fwd_file': fastq_file_path,
                                                                            'interleaved': interleaved,
                                                                            'sequencing_tech': sequencing_tech
                                                                        })['obj_ref'])
@@ -492,7 +492,7 @@ class kb_grinder:
                      'direct_html_link_index': 0,
                      'file_links': [],
                      'html_links': [],
-                     'workspace_name': params['workspace'],
+                     'workspace_name': params['workspace_name'],
                      'report_object_name': reportName
                      }
 
