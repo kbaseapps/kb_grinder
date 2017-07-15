@@ -140,7 +140,8 @@ class kb_grinder:
 
 
         # param checks
-        required_params = ['input_refs',
+        required_params = ['workspace_name',
+                           'input_refs',
                            'output_name',
                            'num_reads_per_lib',
                            'population_percs',

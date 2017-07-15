@@ -96,7 +96,7 @@ class kb_grinderTest(unittest.TestCase):
         genome_ref_2 = reference_prok_genomes_WS+'/GCF_000021385.1/1'  # D. vulgaris str. 'Miyazaki F'
         genome_ref_3 = reference_prok_genomes_WS+'/GCF_900129775.1/1'  # Halobaculum gomorrense (16 contigs)
         
-        parameters = { 'workspace': self.getWsName(),
+        parameters = { 'workspace_name': self.getWsName(),
                        'desc': 'test',
                        'input_refs': [genome_ref_1, genome_ref_2, genome_ref_3],
                        'output_name': 'foo.PERS',
