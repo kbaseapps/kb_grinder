@@ -23,6 +23,7 @@ from Bio import SeqIO
 from biokbase.workspace.client import Workspace as workspaceService
 from AssemblyUtil.AssemblyUtilClient import AssemblyUtil
 from DataFileUtil.DataFileUtilClient import DataFileUtil as DFUClient
+from ReadsUtils.ReadsUtilsClient import ReadsUtils
 from KBaseReport.KBaseReportClient import KBaseReport
 
 #END_HEADER
@@ -123,14 +124,20 @@ class kb_grinder:
         self.log(console, 'Running KButil_Build_InSilico_Metagenomes_with_Grinder(): ')
         self.log(console, "\n"+pformat(params))
 
+        # Auth
         token = ctx['token']
-        wsClient = workspaceService(self.workspaceURL, token=token)
         headers = {'Authorization': 'OAuth '+token}
         env = os.environ.copy()
         env['KB_AUTH_TOKEN'] = token
 
+        # API Clients
         #SERVICE_VER = 'dev'  # DEBUG
         SERVICE_VER = 'release'
+        wsClient = workspaceService(self.workspaceURL, token=token)
+        readsUtils_Client = ReadsUtils (url=self.callbackURL, token=ctx['token'])  # SDK local
+        auClient = AssemblyUtil(self.callbackURL, token=ctx['token'], service_ver=SERVICE_VER)
+        dfu = DFUClient(self.callbackURL)
+
 
         # param checks
         required_params = ['input_refs',
@@ -268,9 +275,6 @@ class kb_grinder:
         # get fastas for scaffolds
         if len(invalid_msgs) == 0:
             contig_file_paths = []
-            SERVICE_VER='release'
-            auClient = AssemblyUtil(self.callbackURL, token=ctx['token'], service_ver=SERVICE_VER)
-            dfu = DFUClient(self.callbackURL)
 
             for genome_i,input_ref in enumerate(genome_refs):
                 contig_file = auClient.get_assembly_as_fasta({'ref':assembly_refs[genome_i]}).get('path')
@@ -440,6 +444,7 @@ class kb_grinder:
         if len(invalid_msgs) == 0:
             lib_obj_refs = []
             lib_obj_names = []
+
             for sample_i,fastq_file_path in enumerate(fastq_file_paths):
 
                 if not os.path.isfile (fastq_file_path) \
