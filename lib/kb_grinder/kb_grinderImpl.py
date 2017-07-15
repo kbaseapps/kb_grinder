@@ -219,17 +219,18 @@ class kb_grinder:
 
         #### STEP 2: get genome scaffold sequences
         ##
-        genomes_src_db_file_path = os.path.join (output_dir, 'genomes.fna')
-        read_buf_size  = 65536
-        write_buf_size = 65536
-        accepted_input_types = ["KBaseGenomes.Genome"]
-        genome_refs = params['input_refs']
-        genome_obj_names = []
-        genome_sci_names = []
-        assembly_refs    = []
-        
         if len(invalid_msgs) == 0:
+            genomes_src_db_file_path = os.path.join (output_dir, 'genomes.fna')
+            read_buf_size  = 65536
+            write_buf_size = 65536
+            accepted_input_types = ["KBaseGenomes.Genome"]
+            genome_refs = params['input_refs']
+            genome_obj_names = []
+            genome_sci_names = []
+            assembly_refs    = []
+        
             for i,input_ref in enumerate(genome_refs):
+                # genome obj info
                 try:
                     [OBJID_I, NAME_I, TYPE_I, SAVE_DATE_I, VERSION_I, SAVED_BY_I, WSID_I, WORKSPACE_I, CHSUM_I, SIZE_I, META_I] = range(11)  # object_info tuple
                     input_obj_info = wsClient.get_object_info_new ({'objects':[{'ref':input_ref}]})[0]
@@ -241,6 +242,7 @@ class kb_grinder:
                 if input_obj_type not in accepted_input_types:
                     raise ValueError ("Input object of type '"+input_obj_type+"' not accepted.  Must be one of "+", ".join(accepted_input_types))
 
+                # genome obj data
                 try:
                     genome_obj = wsClient.get_objects([{'ref':input_ref}])[0]['data']
                     genome_sci_names.append(genome_obj['scientific_name'])
@@ -264,8 +266,8 @@ class kb_grinder:
                     assembly_refs.append(genome_obj['contigset_ref'])
 
         # get fastas for scaffolds
-        contig_file_paths = []
         if len(invalid_msgs) == 0:
+            contig_file_paths = []
             SERVICE_VER='release'
             auClient = AssemblyUtil(self.callbackURL, token=ctx['token'], service_ver=SERVICE_VER)
             dfu = DFUClient(self.callbackURL)
@@ -295,12 +297,12 @@ class kb_grinder:
                                     contig_seqs.append (contig_seq)
                                     contig_seq = ''
                                     continue
-                                else:
-                                    #genomes_src_db_fh.write(contig_line)
-                                    contig_seq += contig_line
-                                    if contig_seq != '':
-                                        contig_seqs.append (contig_seq)
-                                        contig_seq = ''
+                            else:
+                                #genomes_src_db_fh.write(contig_line)
+                                contig_seq += contig_line
+                        if contig_seq != '':
+                            contig_seqs.append (contig_seq)
+                            contig_seq = ''
                                         
                     # write joined contigs to file
                     genome_seq = "NNNNNNNNNN".join(contig_seqs)  # NOTE: Using "-exclude_chars" grinder opt on N to avoid contig joins
@@ -324,7 +326,7 @@ class kb_grinder:
                         toggle = 0
                     elif toggle == 0:
                     #elif genome_id == 'G3':
-                        self.log(console, 'GENOMES_SRC_DB: '+contig_line[0:10000])
+                        self.log(console, 'GENOMES_SRC_DB: '+contig_line[0:50]+'...')
                         toggle += 1
 
 
@@ -391,9 +393,9 @@ class kb_grinder:
 
             # RUN
             cmd_str = " ".join(cmd)
-            self.log (console, "\n===========================================================")
+            self.log (console, "===========================================")
             self.log (console, "RUNNING: "+cmd_str)
-            self.log (console, "===========================================================\n")
+            self.log (console, "===========================================")
 
             cmdProcess = subprocess.Popen(cmd_str, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
             outputlines = []
@@ -416,14 +418,18 @@ class kb_grinder:
             # capture output for report and paths to out files
             report_text_buf   = []
             struct_file_paths = []
+            struct_file_names = []
             fastq_file_paths  = []
             for out_line in outputlines:
                 if 'Community structure' in out_line:
                     clean_line = out_line.strip()
-                    struct_file_paths.append (re.split(r'\s+',clean_line)[2])
+                    struct_file_path = re.split(r'\s+',clean_line)[3]
+                    struct_file_paths.append (struct_file_path)
+                    struct_file_names.append(struct_file_path.split('/')[-1])
+                    self.log(console,"STRUCT_FILE_NAME: '"+struct_file_path.split('/')[-1])  # DEBUG
                 elif 'FASTQ file' in out_line:
                     clean_line = out_line.strip()
-                    fastq_file_paths.append (re.split(r'\s+',clean_line)[2])
+                    fastq_file_paths.append (re.split(r'\s+',clean_line)[3])
                 else:
                     report_text_buf.append (out_line)
             report_text += "\n".join(report_text_buf)
@@ -444,18 +450,18 @@ class kb_grinder:
 
                     # lib obj name
                     if len(fastq_file_paths) == 0:
-                        output_obj_name = input_params['output_name']
+                        output_obj_name = params['output_name']
                     else:
-                        if params['pair_flag'] == 1:
-                            output_obj_name = input_params['output_name']+'-'+str(sample_i+1)+".PairedEndLib"
+                        if params['pairs_flag'] == 1:
+                            output_obj_name = params['output_name']+'-'+str(sample_i+1)+".PairedEndLib"
                         else:
-                            output_obj_name = input_params['output_name']+'-'+str(sample_i+1)+".SingleEndLib"
+                            output_obj_name = params['output_name']+'-'+str(sample_i+1)+".SingleEndLib"
                     lib_obj_names.append (output_obj_name)
 
                     # upload lib and get obj ref
                     self.log(console, 'Uploading trimmed paired reads: '+output_obj_name)
                     sequencing_tech = 'artificial reads'
-                    if params['pair_flag'] == 1:
+                    if params['pairs_flag'] == 1:
                         interleaved = 1
                     else:
                         interleaved = 0
@@ -484,36 +490,50 @@ class kb_grinder:
                      'report_object_name': reportName
                      }
 
+        # message
         if len(invalid_msgs) > 0:
             report_text = "\n".join(invalid_msgs)
-
         reportObj['message'] = report_text
 
+        if len(invalid_msgs) == 0:
+            # objs
+            for lib_obj_i,lib_obj_ref in enumerate(lib_obj_refs):
+                reportObj['objects_created'].append({'ref': lib_obj_ref,
+                                                     'desc': lib_obj_names[lib_obj_i]
+                                                 })
+            # downloadable data
+            for data_i,data_path in enumerate(struct_file_paths):
+                try:
+                    upload_ret = dfu.file_to_shock({'file_path': data_path,
+                                                    #'pack': 'zip'})
+                                                    'make_handle': 0})
+                except:
+                    raise ValueError ('error uploading '+data_path+' file to shock')
+                reportObj['file_links'].append({'shock_id': upload_ret['shock_id'],
+                                                'name': struct_file_names[data_i],
+                                                'label': struct_file_names[data_i]
+                                            })
 
-	# ADD REPORT HTML HERE
-        #html_report_str = "\n".join(html_report_lines)
-        #reportObj['direct_html'] = html_report_str
-
-        # write html to file and upload
-        #html_file = os.path.join (output_dir, 'domain_profile_report.html')
-        #with open (html_file, 'w', 0) as html_handle:
-        #    html_handle.write(html_report_str)
-        #dfu = DFUClient(self.callbackURL)
-        #try:
-        #    upload_ret = dfu.file_to_shock({'file_path': html_file,
-        #                                    'make_handle': 0,
-        #                                    'pack': 'zip'})
-        #except:
-        #    raise ValueError ('Logging exception loading html_report to shock')
-        #
-        #reportObj['html_links'] = [{'shock_id': upload_ret['shock_id'],
-        #                            'name': 'domain_profile_report.html',
-        #                            'label': 'Functional Domain Profile report'}
-        #                           ]
+            # html report
+            """
+            try:
+                html_upload_ret = dfu.file_to_shock({'file_path': html_output_dir,
+                                                     'make_handle': 0,
+                                                     'pack': 'zip'})
+            except:
+                raise ValueError ('error uploading html report to shock')
+            reportObj['direct_html_link_index'] = 0
+            reportObj['html_links'] = [{'shock_id': html_upload_ret['shock_id'],
+                                        'name': html_file,
+                                        'label': params['output_name']+' HTML'
+                                    }
+                                   ]
+            """
 
 
         # save report object
         #
+        SERVICE_VER = 'release'
         reportClient = KBaseReport(self.callbackURL, token=ctx['token'], service_ver=SERVICE_VER)
         #report_info = report.create({'report':reportObj, 'workspace_name':params['workspace_name']})
         report_info = reportClient.create_extended_report(reportObj)
