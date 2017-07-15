@@ -21,7 +21,9 @@ import math
 from Bio import SeqIO
 
 from biokbase.workspace.client import Workspace as workspaceService
+from AssemblyUtil.AssemblyUtilClient import AssemblyUtil
 from DataFileUtil.DataFileUtilClient import DataFileUtil as DFUClient
+from ReadsUtils.ReadsUtilsClient import ReadsUtils
 from KBaseReport.KBaseReportClient import KBaseReport
 
 #END_HEADER
@@ -49,11 +51,14 @@ class kb_grinder:
     GIT_COMMIT_HASH = "77a95c1c911a4e21ccead89151cf30b86d181a25"
 
     #BEGIN_CLASS_HEADER
+    workspaceURL = None
+    GRINDER = '/usr/local/bin/grinder'
 
     def log(self, target, message):
+        timestamp = str(datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3])
         if target is not None:
-            target.append(message)
-        print(message)
+            target.append('['+timestamp+'] '+message)
+        print('['+timestamp+'] '+message)
         sys.stdout.flush()
 
     #END_CLASS_HEADER
@@ -110,23 +115,33 @@ class kb_grinder:
         # ctx is the context object
         # return variables are: returnVal
         #BEGIN KButil_Build_InSilico_Metagenomes_with_Grinder
+
         #### STEP 0: basic init
         ##
         console = []
+        invalid_msgs = []
+        report_text = ''
         self.log(console, 'Running KButil_Build_InSilico_Metagenomes_with_Grinder(): ')
         self.log(console, "\n"+pformat(params))
 
+        # Auth
         token = ctx['token']
-        wsClient = workspaceService(self.workspaceURL, token=token)
         headers = {'Authorization': 'OAuth '+token}
         env = os.environ.copy()
         env['KB_AUTH_TOKEN'] = token
 
+        # API Clients
         #SERVICE_VER = 'dev'  # DEBUG
         SERVICE_VER = 'release'
+        wsClient = workspaceService(self.workspaceURL, token=token)
+        readsUtils_Client = ReadsUtils (url=self.callbackURL, token=ctx['token'])  # SDK local
+        auClient = AssemblyUtil(self.callbackURL, token=ctx['token'], service_ver=SERVICE_VER)
+        dfu = DFUClient(self.callbackURL)
+
 
         # param checks
-        required_params = ['input_refs',
+        required_params = ['workspace_name',
+                           'input_refs',
                            'output_name',
                            'num_reads_per_lib',
                            'population_percs',
@@ -147,7 +162,6 @@ class kb_grinder:
             if arg not in params or params[arg] == None or params[arg] == '':
                 raise ValueError ("Must define required param: '"+arg+"'")
 
-
         # load provenance
         provenance = [{}]
         if 'provenance' in ctx:
@@ -156,54 +170,320 @@ class kb_grinder:
         for input_ref in params['input_refs']:
             provenance[0]['input_ws_objects'].append(input_ref)
 
-
-        # set the output path
+        # set the output paths
         timestamp = int((datetime.utcnow() - datetime.utcfromtimestamp(0)).total_seconds()*1000)
         output_dir = os.path.join(self.scratch,'output.'+str(timestamp))
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
+        html_output_dir = os.path.join(output_dir,'html')
+        if not os.path.exists(html_output_dir):
+            os.makedirs(html_output_dir)
 
 
-        #### STEP 1: get genome scaffold sequences
+        #### STEP 1: Parse population_percs and write to file
         ##
-        accepted_input_types = ["KBaseGenomes.Genome"]
-        genome_refs = params['input_refs']
-        #genome_refs = ['21855/9/1', '21855/8/1', '21855/7/1']    # DEBUG
-        genome_obj_names = []
-        genome_sci_names = []
-        scaffold_refs = dict()
+        abundance_str = params['population_percs'].strip()
+        abundance_file_path = os.path.join(output_dir,'my_abundances.txt')
+        abundance_config_num_libs = 0
+        abundance_config_num_libs_set = False
+        grinder_genome_ids = []
+        out_buf = []
+
+        for row in abundance_str.split("\n"):
+            cols = re.split(r'\s+',row)
+            if cols[0].upper() == "GENOME":
+                continue
+            grinder_genome_ids.append(cols[0])
+            self.log(console, "GRINDER GENOME ID: '"+cols[0]+"'")  # DEBUG
+            out_row = []
+            for col in cols:
+                if col == '':
+                    continue
+                elif col == '%':
+                    continue
+                elif col.endswith('%'):
+                    col = col.rstrip('%')
+                out_row.append(col)
+            out_buf.append("\t".join(out_row))
+            num_samples = len(out_row) - 1  # first col is genome id
+            if not abundance_config_num_libs_set:
+                abundance_config_num_libs_set = True
+                abundance_config_num_libs = num_samples
+            elif num_samples != abundance_config_num_libs:
+                invalid_msgs.append ("inconsistent number of samples in population_percs input field")
+        if abundance_config_num_libs == 0:
+            invalid_msgs.append ("unable to find sample percentages in population_percs input field")
+
+        if len(invalid_msgs) == 0:
+            with open(abundance_file_path, 'w') as abundance_fh:
+                for out_line in out_buf:
+                    abundance_fh.write(out_line+"\n")
+            # DEBUG
+            with open(abundance_file_path, 'r') as abundance_fh:
+                for out_line in abundance_fh.readlines():
+                    out_line = out_line.rstrip()
+                    self.log(console, "ABUNDANCE_CONFIG: '"+out_line+"'")
+
+
+        #### STEP 2: get genome scaffold sequences
+        ##
+        if len(invalid_msgs) == 0:
+            genomes_src_db_file_path = os.path.join (output_dir, 'genomes.fna')
+            read_buf_size  = 65536
+            write_buf_size = 65536
+            accepted_input_types = ["KBaseGenomes.Genome"]
+            genome_refs = params['input_refs']
+            genome_obj_names = []
+            genome_sci_names = []
+            assembly_refs    = []
         
-        for i,input_ref in enumerate(genome_refs):
-            try:
-                [OBJID_I, NAME_I, TYPE_I, SAVE_DATE_I, VERSION_I, SAVED_BY_I, WSID_I, WORKSPACE_I, CHSUM_I, SIZE_I, META_I] = range(11)  # object_info tuple
-                input_obj_info = wsClient.get_object_info_new ({'objects':[{'ref':input_ref}]})[0]
-                input_obj_type = re.sub ('-[0-9]+\.[0-9]+$', "", input_obj_info[TYPE_I])  # remove trailing version
-                genome_obj_names.append(input_obj_info[NAME_I])
+            for i,input_ref in enumerate(genome_refs):
+                # genome obj info
+                try:
+                    [OBJID_I, NAME_I, TYPE_I, SAVE_DATE_I, VERSION_I, SAVED_BY_I, WSID_I, WORKSPACE_I, CHSUM_I, SIZE_I, META_I] = range(11)  # object_info tuple
+                    input_obj_info = wsClient.get_object_info_new ({'objects':[{'ref':input_ref}]})[0]
+                    input_obj_type = re.sub ('-[0-9]+\.[0-9]+$', "", input_obj_info[TYPE_I])  # remove trailing version
+                    genome_obj_names.append(input_obj_info[NAME_I])
 
-            except Exception as e:
-                raise ValueError('Unable to get object from workspace: (' + input_ref +')' + str(e))
-            if input_obj_type not in accepted_input_types:
-                raise ValueError ("Input object of type '"+input_obj_type+"' not accepted.  Must be one of "+", ".join(accepted_input_types))
+                except Exception as e:
+                    raise ValueError('Unable to get object from workspace: (' + input_ref +')' + str(e))
+                if input_obj_type not in accepted_input_types:
+                    raise ValueError ("Input object of type '"+input_obj_type+"' not accepted.  Must be one of "+", ".join(accepted_input_types))
 
-            try:
-                genome_obj = wsClient.get_objects([{'ref':input_ref}])[0]['data']
-                genome_sci_names.append(genome_obj['scientific_name'])
-            except:
-                raise ValueError ("unable to fetch genome: "+input_ref)
+                # genome obj data
+                try:
+                    genome_obj = wsClient.get_objects([{'ref':input_ref}])[0]['data']
+                    genome_sci_names.append(genome_obj['scientific_name'])
+                except:
+                    raise ValueError ("unable to fetch genome: "+input_ref)
 
-            # Get sequences
-            scaffold_refs[input_ref] = []
-            if ('contigset_ref' not in genome_obj or genome_obj['contigset_ref'] == None) \
-                    and ('assembly_ref' not in genome_obj or genome_obj['assembly_ref'] == None):
-                raise ValueError ("Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" MISSING BOTH contigset_ref AND assembly_ref")
-            elif 'assembly_ref' in genome_obj and genome_obj['assembly_ref'] != None:
-                self.log (console, "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING assembly_ref")
-            elif 'contigset_ref' in genome_obj and genome_obj['contigset_ref'] != None:
-                self.log (console, "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING contigset_ref")
+                # Get assembly_refs
+                if ('contigset_ref' not in genome_obj or genome_obj['contigset_ref'] == None) \
+                   and ('assembly_ref' not in genome_obj or genome_obj['assembly_ref'] == None):
+                    msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" MISSING BOTH contigset_ref AND assembly_ref.  Cannot process.  Exiting."
+                    self.log(console, msg)
+                    self.log(invalid_msgs, msg)
+                    continue
+                elif 'assembly_ref' in genome_obj and genome_obj['assembly_ref'] != None:
+                    msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING assembly_ref: "+str(genome_obj['assembly_ref'])
+                    self.log (console, msg)
+                    assembly_refs.append(genome_obj['assembly_ref'])
+                elif 'contigset_ref' in genome_obj and genome_obj['contigset_ref'] != None:
+                    msg = "Genome "+genome_obj_names[i]+" (ref:"+input_ref+") "+genome_sci_names[i]+" USING contigset_ref: "+str(genome_obj['contigset_ref'])
+                    self.log (console, msg)
+                    assembly_refs.append(genome_obj['contigset_ref'])
+
+        # get fastas for scaffolds
+        if len(invalid_msgs) == 0:
+            contig_file_paths = []
+
+            for genome_i,input_ref in enumerate(genome_refs):
+                contig_file = auClient.get_assembly_as_fasta({'ref':assembly_refs[genome_i]}).get('path')
+                sys.stdout.flush()
+                contig_file_path = dfu.unpack_file({'file_path': contig_file})['file_path']
+                contig_file_paths.append(contig_file_path)
+
+            # reformat FASTA IDs for Grinder
+            with open (genomes_src_db_file_path, 'w', write_buf_size) as genomes_src_db_fh:
+                for genome_i,contig_file_path in enumerate(contig_file_paths):
+                    #self.log(console,str(genome_i)+" CONTIG_FILE: "+contig_file_path)  # DEBUG
+                    #contig_ids = []
+                    with open (contig_file_path, 'r', read_buf_size) as contig_fh:
+                        genome_seq = ''
+                        contig_seq = ''
+                        contig_seqs = []
+                        for contig_line in contig_fh.readlines():
+                            contig_line = contig_line.rstrip()
+                            if contig_line.startswith('>'):
+                                #contig_id = contig_line.strip()[1:].split(' ')[0]
+                                #contig_ids.append(contig_id)
+                                #genomes_src_db_fh.write(">"+grinder_genome_ids[genome_i]+"\n")
+                                if contig_seq != '':
+                                    contig_seqs.append (contig_seq)
+                                    contig_seq = ''
+                                    continue
+                            else:
+                                #genomes_src_db_fh.write(contig_line)
+                                contig_seq += contig_line
+                        if contig_seq != '':
+                            contig_seqs.append (contig_seq)
+                            contig_seq = ''
+                                        
+                    # write joined contigs to file
+                    genome_seq = "NNNNNNNNNN".join(contig_seqs)  # NOTE: Using "-exclude_chars" grinder opt on N to avoid contig joins
+                    genome_seq = genome_seq.upper()  # grinder might require upper case?
+                    genomes_src_db_fh.write(">"+grinder_genome_ids[genome_i]+"\n")
+                    genomes_src_db_fh.write(genome_seq+"\n")
+                    genome_seq = ''
+                    contig_seqs = []
+
+                    # DEBUG
+                    #for contig_id in contig_ids:
+                    #    self.log(console, "\tCONTIG_ID: "+contig_id)  # DEBUG
+            # DEBUG
+            toggle = 0
+            with open (genomes_src_db_file_path, 'r', write_buf_size) as genomes_src_db_fh:
+                for contig_line in genomes_src_db_fh.readlines():
+                    contig_line = contig_line.rstrip()
+                    if contig_line.startswith('>'):
+                        self.log(console, 'GENOMES_SRC_DB: '+contig_line)
+                        genome_id = contig_line[1:]
+                        toggle = 0
+                    elif toggle == 0:
+                    #elif genome_id == 'G3':
+                        self.log(console, 'GENOMES_SRC_DB: '+contig_line[0:50]+'...')
+                        toggle += 1
 
 
-        # build report
-        #
+        #### STEP 3: Run Grinder
+        ##
+        if len(invalid_msgs) == 0:
+            cmd = []
+            cmd.append (self.GRINDER)
+            # output
+            cmd.append ('-base_name')
+            cmd.append (params['output_name'])
+            cmd.append ('-output_dir')
+            cmd.append (output_dir)
+            # contigs input
+            cmd.append ('-reference_file')
+            cmd.append (genomes_src_db_file_path)
+            # abundances
+            cmd.append ('-abundance_file')
+            cmd.append (abundance_file_path)
+            # library size
+            cmd.append ('-total_reads')
+            cmd.append (str(params['num_reads_per_lib']))
+            # num libraries (overridden by abundance file?)
+            cmd.append ('-num_libraries')
+            cmd.append (str(abundance_config_num_libs))
+            # read and insert lens
+            cmd.append ('-read_dist')
+            cmd.append (str(params['read_len_mean']))
+            cmd.append ('normal')
+            cmd.append (str(params['read_len_stddev']))
+            if params['pairs_flag'] == 1:
+                cmd.append ('-insert_dist')
+                cmd.append (str(params['insert_len_mean']))
+                cmd.append ('normal')
+                cmd.append (str(params['insert_len_stddev']))
+                # mate orientation
+                cmd.append ('-mate_orientation')
+                cmd.append (params['mate_orientation'])
+            # genome len bias
+            cmd.append ('-length_bias')
+            cmd.append (str(params['len_bias_flag']))
+            # mutation model
+            cmd.append ('-mutation_dist')
+            cmd.append (str(params['mutation_dist']))
+            cmd.append ('-mutation_ratio')
+            cmd.append (str(params['mutation_ratio']))
+            # qual scores
+            cmd.append ('-fastq_output')
+            cmd.append ('1')
+            cmd.append ('-qual_levels')
+            cmd.append (str(params['qual_good']))
+            cmd.append (str(params['qual_bad']))
+            # skip contig joins
+            cmd.append ('-exclude_chars')
+            cmd.append ('NX')
+            # explicitly request bidirectional
+            cmd.append ('-unidirectional')
+            cmd.append ('0')
+            # random seed
+            if 'random_seed' in params and params['random_seed'] != None and params['random_seed'] != '':
+                cmd.append ('-random_seed')
+                cmd.append (str(params['random_seed']))
+
+
+            # RUN
+            cmd_str = " ".join(cmd)
+            self.log (console, "===========================================")
+            self.log (console, "RUNNING: "+cmd_str)
+            self.log (console, "===========================================")
+
+            cmdProcess = subprocess.Popen(cmd_str, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+            outputlines = []
+            while True:
+                line = cmdProcess.stdout.readline()
+                outputlines.append(line)
+                if not line: break
+                self.log(console, line.replace('\n', ''))
+                
+            cmdProcess.stdout.close()
+            cmdProcess.wait()
+            self.log(console, 'return code: ' + str(cmdProcess.returncode) + '\n')
+            if cmdProcess.returncode != 0:
+                raise ValueError('Error running kb_grinder, return code: ' +
+                                 str(cmdProcess.returncode) + '\n')
+
+            #report_text += "\n".join(outputlines)
+            #report_text += "cmdstring: " + cmdstring + " stdout: " + stdout + " stderr " + stderr
+
+            # capture output for report and paths to out files
+            report_text_buf   = []
+            struct_file_paths = []
+            struct_file_names = []
+            fastq_file_paths  = []
+            for out_line in outputlines:
+                if 'Community structure' in out_line:
+                    clean_line = out_line.strip()
+                    struct_file_path = re.split(r'\s+',clean_line)[3]
+                    struct_file_paths.append (struct_file_path)
+                    struct_file_names.append(struct_file_path.split('/')[-1])
+                    self.log(console,"STRUCT_FILE_NAME: '"+struct_file_path.split('/')[-1])  # DEBUG
+                elif 'FASTQ file' in out_line:
+                    clean_line = out_line.strip()
+                    fastq_file_paths.append (re.split(r'\s+',clean_line)[3])
+                else:
+                    report_text_buf.append (out_line)
+            report_text += "\n".join(report_text_buf)
+
+
+        #### STEP 4: Upload Read Libs
+        ##
+        if len(invalid_msgs) == 0:
+            lib_obj_refs = []
+            lib_obj_names = []
+
+            for sample_i,fastq_file_path in enumerate(fastq_file_paths):
+
+                if not os.path.isfile (fastq_file_path) \
+                   or os.path.getsize (fastq_file_path) == 0:
+
+                    raise ValueError ("empty read lib generated: "+fastq_file_path)
+                else:
+
+                    # lib obj name
+                    if len(fastq_file_paths) == 0:
+                        output_obj_name = params['output_name']
+                    else:
+                        if params['pairs_flag'] == 1:
+                            output_obj_name = params['output_name']+'-'+str(sample_i+1)+".PairedEndLib"
+                        else:
+                            output_obj_name = params['output_name']+'-'+str(sample_i+1)+".SingleEndLib"
+                    lib_obj_names.append (output_obj_name)
+
+                    # upload lib and get obj ref
+                    self.log(console, 'Uploading trimmed paired reads: '+output_obj_name)
+                    sequencing_tech = 'artificial reads'
+                    if params['pairs_flag'] == 1:
+                        interleaved = 1
+                    else:
+                        interleaved = 0
+                    lib_obj_refs.append (readsUtils_Client.upload_reads ({ 'wsname': str(params['workspace_name']),
+                                                                           'name': output_obj_name,
+                                                                           'fwd_file': fastq_file_path,
+                                                                           'interleaved': interleaved,
+                                                                           'sequencing_tech': sequencing_tech
+                                                                       })['obj_ref'])
+
+                    os.remove(fastq_file_path)  # free up disk
+            
+            
+
+        #### STEP 5: Build report
+        ##
         reportName = 'kb_grinder_report_'+str(uuid.uuid4())
         reportObj = {'objects_created': [],
                      #'text_message': '',  # or is it 'message'?
@@ -212,34 +492,54 @@ class kb_grinder:
                      'direct_html_link_index': 0,
                      'file_links': [],
                      'html_links': [],
-                     'workspace_name': params['workspace'],
+                     'workspace_name': params['workspace_name'],
                      'report_object_name': reportName
                      }
 
-	# ADD REPORT HTML HERE
-        #html_report_str = "\n".join(html_report_lines)
-        #reportObj['direct_html'] = html_report_str
+        # message
+        if len(invalid_msgs) > 0:
+            report_text = "\n".join(invalid_msgs)
+        reportObj['message'] = report_text
 
-        # write html to file and upload
-        #html_file = os.path.join (output_dir, 'domain_profile_report.html')
-        #with open (html_file, 'w', 0) as html_handle:
-        #    html_handle.write(html_report_str)
-        #dfu = DFUClient(self.callbackURL)
-        #try:
-        #    upload_ret = dfu.file_to_shock({'file_path': html_file,
-        #                                    'make_handle': 0,
-        #                                    'pack': 'zip'})
-        #except:
-        #    raise ValueError ('Logging exception loading html_report to shock')
-        #
-        #reportObj['html_links'] = [{'shock_id': upload_ret['shock_id'],
-        #                            'name': 'domain_profile_report.html',
-        #                            'label': 'Functional Domain Profile report'}
-        #                           ]
+        if len(invalid_msgs) == 0:
+            # objs
+            for lib_obj_i,lib_obj_ref in enumerate(lib_obj_refs):
+                reportObj['objects_created'].append({'ref': lib_obj_ref,
+                                                     'desc': lib_obj_names[lib_obj_i]
+                                                 })
+            # downloadable data
+            for data_i,data_path in enumerate(struct_file_paths):
+                try:
+                    upload_ret = dfu.file_to_shock({'file_path': data_path,
+                                                    #'pack': 'zip'})
+                                                    'make_handle': 0})
+                except:
+                    raise ValueError ('error uploading '+data_path+' file to shock')
+                reportObj['file_links'].append({'shock_id': upload_ret['shock_id'],
+                                                'name': struct_file_names[data_i],
+                                                'label': struct_file_names[data_i]
+                                            })
+
+            # html report
+            """
+            try:
+                html_upload_ret = dfu.file_to_shock({'file_path': html_output_dir,
+                                                     'make_handle': 0,
+                                                     'pack': 'zip'})
+            except:
+                raise ValueError ('error uploading html report to shock')
+            reportObj['direct_html_link_index'] = 0
+            reportObj['html_links'] = [{'shock_id': html_upload_ret['shock_id'],
+                                        'name': html_file,
+                                        'label': params['output_name']+' HTML'
+                                    }
+                                   ]
+            """
 
 
         # save report object
         #
+        SERVICE_VER = 'release'
         reportClient = KBaseReport(self.callbackURL, token=ctx['token'], service_ver=SERVICE_VER)
         #report_info = report.create({'report':reportObj, 'workspace_name':params['workspace_name']})
         report_info = reportClient.create_extended_report(reportObj)
