@@ -24,6 +24,7 @@ from biokbase.workspace.client import Workspace as workspaceService
 from AssemblyUtil.AssemblyUtilClient import AssemblyUtil
 from DataFileUtil.DataFileUtilClient import DataFileUtil as DFUClient
 from ReadsUtils.ReadsUtilsClient import ReadsUtils
+from SetAPI.SetAPIServiceClient import SetAPI
 from KBaseReport.KBaseReportClient import KBaseReport
 
 #END_HEADER
@@ -135,6 +136,8 @@ class kb_grinder:
         SERVICE_VER = 'release'
         wsClient = workspaceService(self.workspaceURL, token=token)
         readsUtils_Client = ReadsUtils (url=self.callbackURL, token=ctx['token'])  # SDK local
+        #setAPI_Client = SetAPI (url=self.callbackURL, token=ctx['token'])  # for SDK local.  local doesn't work for SetAPI
+        setAPI_Client = SetAPI (url=self.serviceWizardURL, token=ctx['token'])  # for dynamic service
         auClient = AssemblyUtil(self.callbackURL, token=ctx['token'], service_ver=SERVICE_VER)
         dfu = DFUClient(self.callbackURL)
 
@@ -362,7 +365,7 @@ class kb_grinder:
             cmd.append (str(params['read_len_mean']))
             cmd.append ('normal')
             cmd.append (str(params['read_len_stddev']))
-            if params['pairs_flag'] == 1:
+            if params['pairs_flag'] == '1':
                 cmd.append ('-insert_dist')
                 cmd.append (str(params['insert_len_mean']))
                 cmd.append ('normal')
@@ -426,26 +429,28 @@ class kb_grinder:
             struct_file_names = []
             fastq_file_paths  = []
             for out_line in outputlines:
+                out_line = out_line.rstrip()
                 if 'Community structure' in out_line:
-                    clean_line = out_line.strip()
+                    clean_line = out_line.lstrip()
                     struct_file_path = re.split(r'\s+',clean_line)[3]
                     struct_file_paths.append (struct_file_path)
                     struct_file_names.append(struct_file_path.split('/')[-1])
                     self.log(console,"STRUCT_FILE_NAME: '"+struct_file_path.split('/')[-1])  # DEBUG
                 elif 'FASTQ file' in out_line:
-                    clean_line = out_line.strip()
+                    clean_line = out_line.lstrip()
                     fastq_file_paths.append (re.split(r'\s+',clean_line)[3])
                 else:
                     report_text_buf.append (out_line)
             report_text += "\n".join(report_text_buf)
 
 
-        #### STEP 4: Upload Read Libs
+        #### STEP 4: Upload Read Libs and create reads set
         ##
         if len(invalid_msgs) == 0:
-            lib_obj_refs = []
-            lib_obj_names = []
-
+            lib_obj_refs   = []
+            lib_obj_names  = []
+            readsSet_items = []
+            
             for sample_i,fastq_file_path in enumerate(fastq_file_paths):
 
                 if not os.path.isfile (fastq_file_path) \
@@ -459,9 +464,9 @@ class kb_grinder:
                         output_obj_name = params['output_name']
                     else:
                         if params['pairs_flag'] == 1:
-                            output_obj_name = params['output_name']+'-'+str(sample_i+1)+".PairedEndLib"
+                            output_obj_name = params['output_name']+'-sample'+str(sample_i+1)+".PairedEndLib"
                         else:
-                            output_obj_name = params['output_name']+'-'+str(sample_i+1)+".SingleEndLib"
+                            output_obj_name = params['output_name']+'-sample'+str(sample_i+1)+".SingleEndLib"
                     lib_obj_names.append (output_obj_name)
 
                     # upload lib and get obj ref
@@ -471,16 +476,31 @@ class kb_grinder:
                         interleaved = 1
                     else:
                         interleaved = 0
-                    lib_obj_refs.append (readsUtils_Client.upload_reads ({ 'wsname': str(params['workspace_name']),
+                    lib_obj_ref = readsUtils_Client.upload_reads ({ 'wsname': str(params['workspace_name']),
                                                                            'name': output_obj_name,
                                                                            'fwd_file': fastq_file_path,
                                                                            'interleaved': interleaved,
                                                                            'sequencing_tech': sequencing_tech
-                                                                       })['obj_ref'])
-
+                                                                       })['obj_ref']
+                    lib_obj_refs.append (lib_obj_ref)
                     os.remove(fastq_file_path)  # free up disk
             
-            
+                    # add to readsSet
+                    readsSet_items.append ({'ref': lib_obj_ref,
+                                            'label': output_obj_name
+                                           })
+            # create readsset
+            readsSet_obj_ref = None
+            if len(lib_obj_refs) > 1:
+                readsSet_obj = { 'description': "Grinder Metagenome from "+" ".join(genome_obj_names),
+                                 'items': readsSet_items
+                             }
+                readsSet_obj_name = params['output_name']
+                readsSet_obj_ref = setAPI_Client.save_reads_set_v1 ({'workspace_name': params['workspace_name'],
+                                                                     'output_object_name': readsSet_obj_name,
+                                                                     'data': readsSet_obj
+                                                                 })['set_ref']
+
 
         #### STEP 5: Build report
         ##
@@ -489,7 +509,7 @@ class kb_grinder:
                      #'text_message': '',  # or is it 'message'?
                      'message': '',  # or is it 'text_message'?
                      'direct_html': '',
-                     'direct_html_link_index': 0,
+                     #'direct_html_link_index': 0,
                      'file_links': [],
                      'html_links': [],
                      'workspace_name': params['workspace_name'],
@@ -503,6 +523,10 @@ class kb_grinder:
 
         if len(invalid_msgs) == 0:
             # objs
+            if readsSet_obj_ref != None:
+                reportObj['objects_created'].append({'ref': readsSet_obj_ref,
+                                                     'desc': params['output_name']+" ReadsSet"
+                                                 })
             for lib_obj_i,lib_obj_ref in enumerate(lib_obj_refs):
                 reportObj['objects_created'].append({'ref': lib_obj_ref,
                                                      'desc': lib_obj_names[lib_obj_i]
