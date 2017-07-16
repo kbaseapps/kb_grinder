@@ -107,7 +107,7 @@ class kb_grinderTest(unittest.TestCase):
                        'pairs_flag': "1",
                        'mate_orientation': "FR",
                        'insert_len_mean': "450",
-                       'insert_len_stddev': "45",
+                       'insert_len_stddev': "45.0",
                        'mutation_dist': "poly4 3e-3 3.3e-8",
                        'mutation_ratio': "80 20",
                        'qual_good': "30",

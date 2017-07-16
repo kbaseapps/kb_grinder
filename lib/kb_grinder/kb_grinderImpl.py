@@ -502,7 +502,6 @@ class kb_grinder:
                                                                  })['set_ref']
 
 
-                    
         #### STEP 5: Build report
         ##
         reportName = 'kb_grinder_report_'+str(uuid.uuid4())
@@ -524,7 +523,7 @@ class kb_grinder:
 
         if len(invalid_msgs) == 0:
             # objs
-            if readsSet_obj_ref != None
+            if readsSet_obj_ref != None:
                 reportObj['objects_created'].append({'ref': readsSet_obj_ref,
                                                      'desc': params['output_name']+" ReadsSet"
                                                  })
