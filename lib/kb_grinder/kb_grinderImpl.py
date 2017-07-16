@@ -362,7 +362,7 @@ class kb_grinder:
             cmd.append (str(params['read_len_mean']))
             cmd.append ('normal')
             cmd.append (str(params['read_len_stddev']))
-            if params['pairs_flag'] == 1:
+            if params['pairs_flag'] == '1':
                 cmd.append ('-insert_dist')
                 cmd.append (str(params['insert_len_mean']))
                 cmd.append ('normal')
