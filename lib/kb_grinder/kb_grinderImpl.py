@@ -426,14 +426,15 @@ class kb_grinder:
             struct_file_names = []
             fastq_file_paths  = []
             for out_line in outputlines:
+                out_line = out_line.rstrip()
                 if 'Community structure' in out_line:
-                    clean_line = out_line.strip()
+                    clean_line = out_line.lstrip()
                     struct_file_path = re.split(r'\s+',clean_line)[3]
                     struct_file_paths.append (struct_file_path)
                     struct_file_names.append(struct_file_path.split('/')[-1])
                     self.log(console,"STRUCT_FILE_NAME: '"+struct_file_path.split('/')[-1])  # DEBUG
                 elif 'FASTQ file' in out_line:
-                    clean_line = out_line.strip()
+                    clean_line = out_line.lstrip()
                     fastq_file_paths.append (re.split(r'\s+',clean_line)[3])
                 else:
                     report_text_buf.append (out_line)
