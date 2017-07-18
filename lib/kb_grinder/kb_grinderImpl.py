@@ -165,6 +165,23 @@ class kb_grinder:
             if arg not in params or params[arg] == None or params[arg] == '':
                 raise ValueError ("Must define required param: '"+arg+"'")
 
+        # cast to str unpredictable numerical params (mostly used in string context)
+        numerical_params = ['num_reads_per_lib',
+                            'read_len_mean',
+                            'read_len_stddev',
+                            'pairs_flag',
+                            'insert_len_mean',
+                            'insert_len_stddev',
+                            'qual_good',
+                            'qual_bad',
+                            'len_bias_flag',
+                            'random_seed'
+                        ]
+        for arg in numerical_params:
+            if arg not in params or params[arg] == None or params[arg] == '':
+                continue
+            params[arg] = str(params[arg])
+
         # load provenance
         provenance = [{}]
         if 'provenance' in ctx:
@@ -365,7 +382,7 @@ class kb_grinder:
             cmd.append (str(params['read_len_mean']))
             cmd.append ('normal')
             cmd.append (str(params['read_len_stddev']))
-            if params['pairs_flag'] == '1':
+            if str(params['pairs_flag']) == '1':
                 cmd.append ('-insert_dist')
                 cmd.append (str(params['insert_len_mean']))
                 cmd.append ('normal')
@@ -463,7 +480,7 @@ class kb_grinder:
                     if len(fastq_file_paths) == 0:
                         output_obj_name = params['output_name']
                     else:
-                        if params['pairs_flag'] == 1:
+                        if str(params['pairs_flag']) == '1':
                             output_obj_name = params['output_name']+'-sample'+str(sample_i+1)+".PairedEndLib"
                         else:
                             output_obj_name = params['output_name']+'-sample'+str(sample_i+1)+".SingleEndLib"
@@ -472,16 +489,16 @@ class kb_grinder:
                     # upload lib and get obj ref
                     self.log(console, 'Uploading trimmed paired reads: '+output_obj_name)
                     sequencing_tech = 'artificial reads'
-                    if params['pairs_flag'] == 1:
+                    if str(params['pairs_flag']) == '1':
                         interleaved = 1
                     else:
                         interleaved = 0
                     lib_obj_ref = readsUtils_Client.upload_reads ({ 'wsname': str(params['workspace_name']),
-                                                                           'name': output_obj_name,
-                                                                           'fwd_file': fastq_file_path,
-                                                                           'interleaved': interleaved,
-                                                                           'sequencing_tech': sequencing_tech
-                                                                       })['obj_ref']
+                                                                    'name': output_obj_name,
+                                                                    'fwd_file': fastq_file_path,
+                                                                    'interleaved': interleaved,
+                                                                    'sequencing_tech': sequencing_tech
+                                                                })['obj_ref']
                     lib_obj_refs.append (lib_obj_ref)
                     os.remove(fastq_file_path)  # free up disk
             
