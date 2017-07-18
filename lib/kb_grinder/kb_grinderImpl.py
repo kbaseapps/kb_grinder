@@ -207,11 +207,16 @@ class kb_grinder:
         abundance_config_num_libs = 0
         abundance_config_num_libs_set = False
         grinder_genome_ids = []
+        header = []
         out_buf = []
 
         for row in abundance_str.split("\n"):
             cols = re.split(r'\s+',row)
             if cols[0].upper() == "GENOME":
+                for col in cols:
+                    if col == '':
+                        continue
+                    header.append(col)
                 continue
             grinder_genome_ids.append(cols[0])
             self.log(console, "GRINDER GENOME ID: '"+cols[0]+"'")  # DEBUG
@@ -231,8 +236,19 @@ class kb_grinder:
                 abundance_config_num_libs = num_samples
             elif num_samples != abundance_config_num_libs:
                 invalid_msgs.append ("inconsistent number of samples in population_percs input field")
+        # data validation
         if abundance_config_num_libs == 0:
             invalid_msgs.append ("unable to find sample percentages in population_percs input field")
+        for row_i,abund_row_str in enumerate(out_buf):
+            sample_sums = []
+            abund_row = abund_row_str.split()
+            for abund_i,abund in enumerate(abund_row.split[1:]):
+                if row_i == 0:
+                    sample_sums.append(0)
+                sample_sums[abund_i] += abund
+        for sample_i,sample_sum in enumerate(sample_sums):
+            if sample_sum < 99.5 or sample_sum > 100.5:
+                self.log (invalid_msgs, "Sample ":+str(sample_i+1)+" "+header[sample_i+1]+" proportions is not summing to 100.0.  Summing to: "+str(sample_sum))
 
         if len(invalid_msgs) == 0:
             with open(abundance_file_path, 'w') as abundance_fh:
