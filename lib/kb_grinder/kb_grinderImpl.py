@@ -48,8 +48,8 @@ class kb_grinder:
     # the latter method is running.
     ######################################### noqa
     VERSION = "0.0.1"
-    GIT_URL = "https://github.com/kbaseapps/kb_grinder.git"
-    GIT_COMMIT_HASH = "77a95c1c911a4e21ccead89151cf30b86d181a25"
+    GIT_URL = "https://github.com/dcchivian/kb_grinder"
+    GIT_COMMIT_HASH = "170e26338ac0d7cce4a03f00c335d18c98683924"
 
     #BEGIN_CLASS_HEADER
     workspaceURL = None
@@ -239,16 +239,17 @@ class kb_grinder:
         # data validation
         if abundance_config_num_libs == 0:
             invalid_msgs.append ("unable to find sample percentages in population_percs input field")
+        sample_sums = []
         for row_i,abund_row_str in enumerate(out_buf):
-            sample_sums = []
             abund_row = abund_row_str.split()
-            for abund_i,abund in enumerate(abund_row.split[1:]):
+            for sample_i,abund in enumerate(abund_row[1:]):
                 if row_i == 0:
                     sample_sums.append(0)
-                sample_sums[abund_i] += abund
+                #self.log (console, "row_i: "+str(row_i)+" sample_i: "+str(sample_i))  # DEBUG
+                sample_sums[sample_i] += float(abund)
         for sample_i,sample_sum in enumerate(sample_sums):
             if sample_sum < 99.5 or sample_sum > 100.5:
-                self.log (invalid_msgs, "Sample ":+str(sample_i+1)+" "+header[sample_i+1]+" proportions is not summing to 100.0.  Summing to: "+str(sample_sum))
+                self.log (invalid_msgs, "Sample: "+str(sample_i+1)+" "+header[sample_i+1]+" proportions is not summing to 100.0. Summing to: "+str(sample_sum))
 
         if len(invalid_msgs) == 0:
             with open(abundance_file_path, 'w') as abundance_fh:

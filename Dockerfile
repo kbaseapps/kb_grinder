@@ -23,9 +23,9 @@ RUN pip install cffi --upgrade \
 
 
 # To download the Grinder software and install it
-RUN wget https://sourceforge.net/projects/biogrinder/files/biogrinder/Grinder-0.5.4/Grinder-0.5.4.tar.gz/download &&\
+RUN curl https://svwh.dl.sourceforge.net/project/biogrinder/biogrinder/Grinder-0.5.3/Grinder-0.5.3.tar.gz > download && \
     tar xvf download && \
-    cd Grinder-0.5.4 && \
+    cd Grinder-0.5.3 && \
     perl Makefile.PL && \
     make && \
     make install

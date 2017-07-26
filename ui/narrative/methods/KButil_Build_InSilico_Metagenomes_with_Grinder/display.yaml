@@ -1,7 +1,7 @@
 #
 # define display information
 #
-name: Build InSilico Metagenomes with Grinder - v0.5.4
+name: Build InSilico Metagenomes with Grinder - v0.5.3
 tooltip: |
     Generate In Silico reads from microbial genomes following input proportions
 screenshots: []
@@ -116,7 +116,7 @@ parameters :
             Specify seed for Randomizer
 
 description : |
-    <p>This method allows the user to generate In Silico reads using the Grinder method (v0.5.4).  This is especially useful in benchmarking methods applied to reads, such as assembly.</p>
+    <p>This method allows the user to generate In Silico reads using the Grinder method (v0.5.3).  This is especially useful in benchmarking methods applied to reads, such as assembly.</p>
 
 publications:
     -
