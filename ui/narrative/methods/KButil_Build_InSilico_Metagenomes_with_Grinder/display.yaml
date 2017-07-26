@@ -48,7 +48,7 @@ parameters :
         ui-name : |
             Num reads per MG
         short-hint : |
-            Number of reads to put into each library sample
+            Number of reads to put into each library sample (note: 100K PE takes about 20 min, per sample)
     population_percs:
         ui-name : |
             Population Perc per genome (row) per sample (col)
