@@ -5,7 +5,7 @@
     ],
     "contact": "help@kbase.us",
     "visible": true,
-    "categories": ["active","util","reads","communities"],
+    "categories": ["inactive","util","reads","communities"],
     "widgets": {
         "input": null,
         "output": "no-display"
